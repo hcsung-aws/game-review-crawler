@@ -2,3 +2,26 @@
 node_modules/
 venv/
 wow_reviews_1months.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Hypothesis testing
+.hypothesis/
+
+# IDE settings
+.vscode/
+
+# Data files (크롤링 결과)
+data/
+quicksight_data/
+
+# Test output
+test_output/
+
+# Temporary files
+*.log
+output.log

@@ -100,7 +100,7 @@ def crawl_game_reviews(keywords, num_results_per_query=5, additional_sites=None)
                 
                 time.sleep(5)  # 사이트별 5초 대기
 
-        output_file = "game_reviews_keywords_with_sites.json"
+        output_file = "data/game_reviews_keywords_with_sites.json"
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(reviews, f, ensure_ascii=False, indent=2)
 
