@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ game.name }} - 버그 리포트</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .severity-critical { 
+            background-color: #dc3545; 
+            color: white; 
+        }
+        .severity-high { 
+            background-color: #fd7e14; 
+            color: white; 
+        }
+        .severity-medium { 
+            background-color: #ffc107; 
+            color: black; 
+        }
+        .severity-low { 
+            background-color: #6c757d; 
+            color: white; 
+        }
+        .severity-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .bug-card {
+            border-left: 4px solid;
+            margin-bottom: 1rem;
+        }
+        .bug-card.critical { border-left-color: #dc3545; }
+        .bug-card.high { border-left-color: #fd7e14; }
+        .bug-card.medium { border-left-color: #ffc107; }
+        .bug-card.low { border-left-color: #6c757d; }
+        .stat-card {
+            text-align: center;
+            padding: 1rem;
+            border-radius: 0.5rem;
+        }
+        .stat-card h3 {
+            font-size: 2rem;
+            margin-bottom: 0.25rem;
+        }
+        .stat-card p {
+            margin-bottom: 0;
+            color: #6c757d;
+        }
+        .keyword-tag {
+            display: inline-block;
+            background-color: #e9ecef;
+            padding: 0.125rem 0.5rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            margin-right: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+        .alert-banner {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <!-- 알림 배너 -->
+    {% if severity_distribution.critical > 0 %}
+    <div class="alert alert-danger alert-banner mb-0 rounded-0" role="alert">
+        <div class="container">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>심각한 버그 {{ severity_distribution.critical }}건 발견!</strong> 즉시 확인이 필요합니다.
+        </div>
+    </div>
+    {% elif severity_distribution.high > 0 %}
+    <div class="alert alert-warning alert-banner mb-0 rounded-0" role="alert">
+        <div class="container">
+            <i class="bi bi-exclamation-circle-fill me-2"></i>
+            <strong>높은 심각도 버그 {{ severity_distribution.high }}건 발견.</strong> 확인이 필요합니다.
+        </div>
+    </div>
+    {% endif %}
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-controller me-2"></i>게임 커뮤니티 분석
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">
+                    <i class="bi bi-house me-1"></i>홈
+                </a>
+                <a class="nav-link" href="/game/{{ game.game_id }}">
+                    <i class="bi bi-arrow-left me-1"></i>{{ game.name }} 대시보드
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- 헤더 -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1><i class="bi bi-bug me-2"></i>{{ game.name }} - 버그 리포트</h1>
+                <p class="text-muted mb-0">커뮤니티에서 보고된 버그 및 오류 이슈</p>
+            </div>
+            <a href="/game/{{ game.game_id }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>대시보드로 돌아가기
+            </a>
+        </div>
+
+        <!-- 심각도 분포 카드 -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="stat-card bg-danger bg-opacity-10">
+                    <h3 class="text-danger">{{ severity_distribution.critical }}</h3>
+                    <p><span class="severity-badge severity-critical">CRITICAL</span></p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card bg-warning bg-opacity-10">
+                    <h3 class="text-warning">{{ severity_distribution.high }}</h3>
+                    <p><span class="severity-badge severity-high">HIGH</span></p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card" style="background-color: rgba(255, 193, 7, 0.1);">
+                    <h3 style="color: #997404;">{{ severity_distribution.medium }}</h3>
+                    <p><span class="severity-badge severity-medium">MEDIUM</span></p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card bg-secondary bg-opacity-10">
+                    <h3 class="text-secondary">{{ severity_distribution.low }}</h3>
+                    <p><span class="severity-badge severity-low">LOW</span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 필터 -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label">시작일</label>
+                        <input type="date" class="form-control" name="start_date" value="{{ filters.start_date }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">종료일</label>
+                        <input type="date" class="form-control" name="end_date" value="{{ filters.end_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">사이트</label>
+                        <select class="form-select" name="site" multiple>
+                            {% for site in available_sites %}
+                            <option value="{{ site }}" {% if site in filters.sites %}selected{% endif %}>{{ site }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">심각도</label>
+                        <select class="form-select" name="severity">
+                            <option value="">전체</option>
+                            <option value="critical" {% if filters.severity == 'critical' %}selected{% endif %}>Critical</option>
+                            <option value="high" {% if filters.severity == 'high' %}selected{% endif %}>High</option>
+                            <option value="medium" {% if filters.severity == 'medium' %}selected{% endif %}>Medium</option>
+                            <option value="low" {% if filters.severity == 'low' %}selected{% endif %}>Low</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="bi bi-funnel me-1"></i>필터 적용
+                        </button>
+                        <a href="/game/{{ game.game_id }}/bugs" class="btn btn-outline-secondary">초기화</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 버그 이슈 목록 -->
+        <h4 class="mb-3"><i class="bi bi-list-ul me-2"></i>버그 이슈 목록 ({{ bug_issues|length }}건)</h4>
+        
+        {% if bug_issues %}
+        {% for issue in bug_issues %}
+        <div class="card bug-card {{ issue.severity.value }}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h5 class="card-title mb-2">
+                            <span class="severity-badge severity-{{ issue.severity.value }} me-2">{{ issue.severity.value }}</span>
+                            {{ issue.title }}
+                        </h5>
+                        <div class="mb-2">
+                            {% for keyword in issue.cluster.keywords[:5] %}
+                            <span class="keyword-tag">{{ keyword }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <div class="text-muted small">우선순위 점수</div>
+                        <div class="h5 mb-0">{{ "%.2f"|format(issue.priority_score) }}</div>
+                    </div>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-md-3">
+                        <small class="text-muted">관련 게시글</small>
+                        <div class="fw-bold">{{ issue.cluster.post_count }}개</div>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted">총 조회수</small>
+                        <div class="fw-bold">{{ "{:,}".format(issue.cluster.total_views) }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted">총 댓글수</small>
+                        <div class="fw-bold">{{ "{:,}".format(issue.cluster.total_comments) }}</div>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted">평균 감성</small>
+                        <div class="fw-bold {% if issue.sentiment_avg < -0.3 %}text-danger{% elif issue.sentiment_avg > 0.3 %}text-success{% endif %}">
+                            {{ "%.2f"|format(issue.sentiment_avg) }}
+                        </div>
+                    </div>
+                </div>
+                
+                {% if issue.first_seen %}
+                <div class="mt-2">
+                    <small class="text-muted">
+                        <i class="bi bi-clock me-1"></i>최초 발견: {{ issue.first_seen.strftime('%Y-%m-%d %H:%M') }}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            현재 조건에 해당하는 버그 이슈가 없습니다.
+        </div>
+        {% endif %}
+
+        <!-- 관련 게시글 목록 -->
+        {% if bug_posts %}
+        <h4 class="mt-5 mb-3"><i class="bi bi-file-text me-2"></i>버그 관련 게시글</h4>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>심각도</th>
+                        <th>이슈</th>
+                        <th>제목</th>
+                        <th>사이트</th>
+                        <th>작성일</th>
+                        <th>조회수</th>
+                        <th>댓글</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for post in bug_posts %}
+                    <tr>
+                        <td>
+                            <span class="severity-badge severity-{{ post.severity }}">{{ post.severity }}</span>
+                        </td>
+                        <td>{{ post.issue_title }}</td>
+                        <td>
+                            <a href="/post/{{ post.url }}" class="text-decoration-none">
+                                {{ post.title[:50] }}{% if post.title|length > 50 %}...{% endif %}
+                            </a>
+                        </td>
+                        <td><span class="badge bg-secondary">{{ post.site }}</span></td>
+                        <td>{{ post.created_at[:10] if post.created_at else '-' }}</td>
+                        <td>{{ "{:,}".format(post.view_count) }}</td>
+                        <td>{{ post.comment_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <footer class="bg-light py-4 mt-5">
+        <div class="container text-center text-muted">
+            <p class="mb-0">게임 커뮤니티 반응 분석 대시보드</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

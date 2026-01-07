@@ -10,5 +10,12 @@ __all__ = [
     "deduplicate_urls",
     "deduplicate_search_results",
     "normalize_url",
-    "RateLimiter"
+    "RateLimiter",
 ]
+
+# Lazy import to avoid circular dependency
+def __getattr__(name):
+    if name in ("DataFilter", "FilterCriteria", "SortField", "SortOrder"):
+        from crawler.utils.data_filter import DataFilter, FilterCriteria, SortField, SortOrder
+        return locals()[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

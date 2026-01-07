@@ -3,25 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>크롤링 결과 대시보드</title>
+    <title>게임 커뮤니티 분석 대시보드</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .card { transition: transform 0.2s; }
-        .card:hover { transform: translateY(-2px); }
+        .card { transition: transform 0.2s, box-shadow 0.2s; }
+        .card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.15); }
+        .game-card { cursor: pointer; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <!-- 헤더 -->
-    <header class="bg-blue-600 text-white py-6 shadow-lg">
+    <header class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-6 shadow-lg">
         <div class="container mx-auto px-4">
-            <h1 class="text-3xl font-bold">🎮 게임 커뮤니티 크롤링 대시보드</h1>
-            <p class="text-blue-200 mt-2">수집된 게시글 및 댓글 분석</p>
+            <h1 class="text-3xl font-bold">🎮 게임 커뮤니티 분석 대시보드</h1>
+            <p class="text-blue-200 mt-2">게임별 커뮤니티 반응 분석 및 이슈 탐지</p>
         </div>
     </header>
 
     <main class="container mx-auto px-4 py-8">
-        <!-- 통계 카드 -->
+        <!-- 전체 통계 카드 -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div class="card bg-white rounded-lg shadow-md p-6">
                 <div class="flex items-center">
@@ -68,17 +69,79 @@
             
             <div class="card bg-white rounded-lg shadow-md p-6">
                 <div class="flex items-center">
-                    <div class="p-3 bg-red-100 rounded-full">
-                        <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                    <div class="p-3 bg-indigo-100 rounded-full">
+                        <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                     </div>
                     <div class="ml-4">
-                        <p class="text-gray-500 text-sm">총 추천수</p>
-                        <p class="text-2xl font-bold text-gray-800">{{ "{:,}".format(stats.total_likes) }}</p>
+                        <p class="text-gray-500 text-sm">분석 게임</p>
+                        <p class="text-2xl font-bold text-gray-800">{{ games|length }}</p>
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- 게임 선택 섹션 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">🎯 게임별 분석</h2>
+            <p class="text-gray-600 mb-6">분석할 게임을 선택하세요. 각 게임의 커뮤니티 반응, 감성 분석, 이슈 탐지 결과를 확인할 수 있습니다.</p>
+            
+            {% if games %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {% for game in games %}
+                <div class="game-card card bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200 p-6 hover:border-blue-400" 
+                     onclick="window.location='/game/{{ game.game_id }}'">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800">{{ game.name }}</h3>
+                            <p class="text-sm text-gray-500">{{ game.keyword }}</p>
+                        </div>
+                        <span class="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full">
+                            {{ game.post_count }}개
+                        </span>
+                    </div>
+                    
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">총 조회수</span>
+                            <span class="font-medium text-gray-700">{{ "{:,}".format(game.total_views) }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">총 댓글</span>
+                            <span class="font-medium text-gray-700">{{ "{:,}".format(game.total_comments) }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">최근 업데이트</span>
+                            <span class="font-medium text-gray-700">{{ game.latest_date or '-' }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 pt-4 border-t border-gray-200">
+                        <div class="flex flex-wrap gap-1">
+                            {% for site in game.sites %}
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if 'inven' in site %}bg-blue-100 text-blue-700
+                                {% elif 'ruliweb' in site %}bg-green-100 text-green-700
+                                {% elif 'dcinside' in site %}bg-yellow-100 text-yellow-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ site }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-12">
+                <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-gray-500">아직 수집된 게임 데이터가 없습니다.</p>
+                <p class="text-gray-400 text-sm mt-2">크롤러를 실행하여 게임 커뮤니티 데이터를 수집해주세요.</p>
+            </div>
+            {% endif %}
         </div>
 
         <!-- 차트 영역 -->
@@ -93,28 +156,31 @@
             </div>
         </div>
 
-        <!-- 게시글 목록 -->
+        <!-- 최근 게시글 목록 -->
         <div class="bg-white rounded-lg shadow-md p-6">
-            <h3 class="text-lg font-semibold mb-4">📝 수집된 게시글 목록</h3>
+            <h3 class="text-lg font-semibold mb-4">📝 최근 수집된 게시글</h3>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">제목</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">게임</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사이트</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작성자</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작성일</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">조회수</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">댓글</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
-                        {% for post in posts %}
+                        {% for post in posts[:20] %}
                         <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/post/{{ post.url }}'">
                             <td class="px-6 py-4">
                                 <div class="text-sm font-medium text-gray-900 truncate max-w-md" title="{{ post.title }}">
                                     {{ post.title[:50] }}{% if post.title|length > 50 %}...{% endif %}
                                 </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="text-sm text-gray-600">{{ post.keyword or '-' }}</span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
@@ -124,9 +190,6 @@
                                     {% else %}bg-gray-100 text-gray-800{% endif %}">
                                     {{ post.site }}
                                 </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ post.author or '-' }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {{ post.created_at[:10] if post.created_at else '-' }}
@@ -148,13 +211,13 @@
     <!-- 푸터 -->
     <footer class="bg-gray-800 text-white py-4 mt-8">
         <div class="container mx-auto px-4 text-center">
-            <p>게임 커뮤니티 크롤러 대시보드 | 데이터 수집 시간: {{ now }}</p>
+            <p>게임 커뮤니티 분석 대시보드 | 데이터 수집 시간: {{ now }}</p>
         </div>
     </footer>
 
     <script>
         // 사이트별 차트
-        const siteData = {{ stats.sites | tojson }};
+        const siteData = {{ stats.sites | tojson | safe }};
         const siteLabels = Object.keys(siteData);
         const siteCounts = siteLabels.map(s => siteData[s].count);
         
@@ -176,7 +239,7 @@
         });
 
         // 날짜별 차트
-        const dateData = {{ stats.dates | tojson }};
+        const dateData = {{ stats.dates | tojson | safe }};
         const dateLabels = Object.keys(dateData);
         const dateCounts = Object.values(dateData);
         

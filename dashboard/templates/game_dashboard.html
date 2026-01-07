@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ game.name }} - 게임 분석 대시보드</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .card { transition: transform 0.2s, box-shadow 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
+        .filter-section { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- 헤더 -->
+    <header class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-6 shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <a href="/" class="text-blue-200 hover:text-white text-sm mb-2 inline-block">
+                        ← 게임 목록으로 돌아가기
+                    </a>
+                    <h1 class="text-3xl font-bold">🎮 {{ game.name }}</h1>
+                    <p class="text-blue-200 mt-1">{{ game.keyword }} 커뮤니티 분석</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm text-blue-200">최근 업데이트</p>
+                    <p class="text-lg font-semibold">{{ game.latest_date[:10] if game.latest_date else '-' }}</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hot Issue 알림 배너 -->
+    <div id="hot-issue-banner" class="hidden">
+        <div class="bg-gradient-to-r from-red-600 to-orange-600 text-white py-3 shadow-lg">
+            <div class="container mx-auto px-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-3 animate-pulse">🔥</span>
+                        <div>
+                            <p id="hot-issue-message" class="font-semibold">긴급 이슈가 발생했습니다!</p>
+                            <p id="hot-issue-detail" class="text-sm text-red-100 mt-0.5"></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="scrollToIssues()" class="px-4 py-1.5 bg-white text-red-600 text-sm font-medium rounded-md hover:bg-red-50 transition-colors">
+                            이슈 확인
+                        </button>
+                        <button onclick="dismissHotIssueBanner()" class="text-white hover:text-red-200 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <!-- 관련 게시글 링크 -->
+                <div id="hot-issue-posts" class="mt-2 hidden">
+                    <div class="flex flex-wrap gap-2 text-sm">
+                        <!-- 동적으로 채워짐 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="container mx-auto px-4 py-8">
+        <!-- 통계 카드 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="card bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-blue-100 rounded-full">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-gray-500 text-sm">게시글 수</p>
+                        <p class="text-2xl font-bold text-gray-800">{{ "{:,}".format(stats.total_posts) }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-purple-100 rounded-full">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-gray-500 text-sm">총 조회수</p>
+                        <p class="text-2xl font-bold text-gray-800">{{ "{:,}".format(stats.total_views) }}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-green-100 rounded-full">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-gray-500 text-sm">총 댓글</p>
+                        <p class="text-2xl font-bold text-gray-800">{{ "{:,}".format(stats.total_comments) }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 감성 분석 섹션 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8" id="sentiment-section">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-bold text-gray-800">😊 감성 분석</h2>
+                <button onclick="loadSentimentData()" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    분석 새로고침
+                </button>
+            </div>
+            
+            <div id="sentiment-loading" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p class="text-gray-500 mt-2">감성 분석 중...</p>
+            </div>
+            
+            <div id="sentiment-content" class="hidden">
+                <!-- 감성 분포 요약 -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <!-- 평균 감성 점수 -->
+                    <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-indigo-600 font-medium">평균 감성 점수</p>
+                        <p id="sentiment-avg" class="text-3xl font-bold text-indigo-700 mt-1">-</p>
+                        <p id="sentiment-avg-label" class="text-xs text-indigo-500 mt-1">-</p>
+                    </div>
+                    
+                    <!-- 긍정 -->
+                    <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-green-600 font-medium">😊 긍정</p>
+                        <p id="sentiment-positive" class="text-3xl font-bold text-green-700 mt-1">-</p>
+                        <p id="sentiment-positive-pct" class="text-xs text-green-500 mt-1">-</p>
+                    </div>
+                    
+                    <!-- 중립 -->
+                    <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-gray-600 font-medium">😐 중립</p>
+                        <p id="sentiment-neutral" class="text-3xl font-bold text-gray-700 mt-1">-</p>
+                        <p id="sentiment-neutral-pct" class="text-xs text-gray-500 mt-1">-</p>
+                    </div>
+                    
+                    <!-- 부정 -->
+                    <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-red-600 font-medium">😠 부정</p>
+                        <p id="sentiment-negative" class="text-3xl font-bold text-red-700 mt-1">-</p>
+                        <p id="sentiment-negative-pct" class="text-xs text-red-500 mt-1">-</p>
+                    </div>
+                </div>
+                
+                <!-- 감성 분포 차트 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-gray-700 mb-3">감성 분포 차트</h3>
+                        <div class="relative" style="height: 200px;">
+                            <canvas id="sentiment-chart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-gray-700 mb-3">감성 비율 바</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-green-600">긍정</span>
+                                    <span id="bar-positive-pct" class="text-green-600">-</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-4">
+                                    <div id="bar-positive" class="bg-green-500 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-gray-600">중립</span>
+                                    <span id="bar-neutral-pct" class="text-gray-600">-</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-4">
+                                    <div id="bar-neutral" class="bg-gray-400 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-red-600">부정</span>
+                                    <span id="bar-negative-pct" class="text-red-600">-</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-4">
+                                    <div id="bar-negative" class="bg-red-500 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 부정적 게시글 목록 -->
+                <div class="border-t pt-6">
+                    <h3 class="text-sm font-medium text-gray-700 mb-3">⚠️ 부정적 게시글 (감성 점수 -0.3 미만)</h3>
+                    <div id="negative-posts-container">
+                        <div id="negative-posts-empty" class="text-center py-8 text-gray-500 hidden">
+                            부정적인 게시글이 없습니다. 👍
+                        </div>
+                        <div id="negative-posts-list" class="space-y-2">
+                            <!-- 동적으로 채워짐 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="sentiment-error" class="hidden text-center py-8">
+                <svg class="w-12 h-12 text-red-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-red-500">감성 분석 데이터를 불러오는데 실패했습니다.</p>
+                <button onclick="loadSentimentData()" class="mt-2 text-blue-600 hover:underline">다시 시도</button>
+            </div>
+        </div>
+
+        <!-- 트렌드 분석 섹션 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8" id="trend-section">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-bold text-gray-800">📈 트렌드 분석</h2>
+                <div class="flex items-center gap-3">
+                    <select id="trend-period" onchange="loadTrendData()" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="daily">일별</option>
+                        <option value="weekly">주별</option>
+                    </select>
+                    <button onclick="loadTrendData()" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        새로고침
+                    </button>
+                </div>
+            </div>
+            
+            <div id="trend-loading" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <p class="text-gray-500 mt-2">트렌드 분석 중...</p>
+            </div>
+            
+            <div id="trend-content" class="hidden">
+                <!-- 트렌드 요약 -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-indigo-600 font-medium">평균 감성</p>
+                        <p id="trend-avg" class="text-2xl font-bold text-indigo-700 mt-1">-</p>
+                    </div>
+                    <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-green-600 font-medium">최고 감성</p>
+                        <p id="trend-max" class="text-2xl font-bold text-green-700 mt-1">-</p>
+                    </div>
+                    <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-red-600 font-medium">최저 감성</p>
+                        <p id="trend-min" class="text-2xl font-bold text-red-700 mt-1">-</p>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-purple-600 font-medium">분석 기간</p>
+                        <p id="trend-period-info" class="text-lg font-bold text-purple-700 mt-1">-</p>
+                    </div>
+                </div>
+                
+                <!-- 감성 트렌드 차트 -->
+                <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                    <h3 class="text-sm font-medium text-gray-700 mb-3">📊 감성 점수 추이</h3>
+                    <div class="relative" style="height: 300px;">
+                        <canvas id="sentiment-trend-chart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- 부정적 감성 급증 알림 -->
+                <div id="spike-alert" class="hidden mb-6">
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <span class="text-2xl mr-3">⚠️</span>
+                            <div>
+                                <h4 class="text-sm font-medium text-red-800">부정적 감성 급증 탐지</h4>
+                                <p id="spike-message" class="text-sm text-red-600 mt-1"></p>
+                                <div id="spike-dates" class="flex flex-wrap gap-2 mt-2">
+                                    <!-- 동적으로 채워짐 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 이슈별 트렌드 (선택적) -->
+                <div class="border-t pt-6">
+                    <h3 class="text-sm font-medium text-gray-700 mb-3">🔍 키워드 트렌드 검색</h3>
+                    <div class="flex gap-3 mb-4">
+                        <input type="text" id="keyword-search" placeholder="키워드 입력 (예: 버그, 업데이트)" 
+                               class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <button onclick="loadKeywordTrend()" class="px-4 py-2 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                            검색
+                        </button>
+                    </div>
+                    <div id="keyword-trend-container" class="hidden">
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 id="keyword-trend-title" class="text-sm font-medium text-gray-700 mb-3">키워드 언급 빈도</h4>
+                            <div class="relative" style="height: 200px;">
+                                <canvas id="keyword-trend-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="trend-error" class="hidden text-center py-8">
+                <svg class="w-12 h-12 text-red-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-red-500">트렌드 데이터를 불러오는데 실패했습니다.</p>
+                <button onclick="loadTrendData()" class="mt-2 text-blue-600 hover:underline">다시 시도</button>
+            </div>
+        </div>
+
+        <!-- Hot Post 섹션 (게시글 기반 이슈 탐지) -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8" id="issues-section">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-bold text-gray-800">🔥 Hot Posts (주목할 게시글)</h2>
+                <button onclick="loadHotPostsData()" class="px-4 py-2 bg-orange-600 text-white text-sm rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                    새로고침
+                </button>
+            </div>
+            
+            <div id="issues-loading" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+                <p class="text-gray-500 mt-2">Hot Post 분석 중...</p>
+            </div>
+            
+            <div id="issues-content" class="hidden">
+                <!-- Hot Post 통계 요약 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <!-- 총 Hot Post 수 -->
+                    <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-orange-600 font-medium">🔥 Hot Posts</p>
+                        <p id="issues-total" class="text-3xl font-bold text-orange-700 mt-1">-</p>
+                    </div>
+                    
+                    <!-- 버그 관련 수 -->
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-purple-600 font-medium">🐛 버그 관련</p>
+                        <p id="issues-bug" class="text-3xl font-bold text-purple-700 mt-1">-</p>
+                    </div>
+                    
+                    <!-- Critical 수 -->
+                    <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-red-600 font-medium">⚠️ Critical</p>
+                        <p id="issues-critical" class="text-3xl font-bold text-red-700 mt-1">-</p>
+                    </div>
+                </div>
+                
+                <!-- Hot Post 목록 테이블 -->
+                <div class="border-t pt-6">
+                    <h3 class="text-sm font-medium text-gray-700 mb-3">📋 Hot Post 목록 (Hot Score 순)</h3>
+                    <div id="issues-list-container">
+                        <div id="issues-empty" class="text-center py-8 text-gray-500 hidden">
+                            탐지된 Hot Post가 없습니다.
+                        </div>
+                        <div id="issues-list" class="overflow-x-auto">
+                            <!-- 동적으로 채워짐 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="issues-error" class="hidden text-center py-8">
+                <svg class="w-12 h-12 text-red-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-red-500">Hot Post 데이터를 불러오는데 실패했습니다.</p>
+                <button onclick="loadHotPostsData()" class="mt-2 text-blue-600 hover:underline">다시 시도</button>
+            </div>
+        </div>
+
+        <!-- 필터 섹션 -->
+        <div class="filter-section rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">🔍 필터 및 정렬</h2>
+            <form method="GET" action="/game/{{ game.game_id }}" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <!-- 기간 필터 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">시작일</label>
+                        <input type="date" name="start_date" value="{{ filters.start_date }}"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">종료일</label>
+                        <input type="date" name="end_date" value="{{ filters.end_date }}"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <!-- 정렬 옵션 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">정렬 기준</label>
+                        <select name="sort" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="created_at" {% if filters.sort_by == 'created_at' %}selected{% endif %}>작성일</option>
+                            <option value="view_count" {% if filters.sort_by == 'view_count' %}selected{% endif %}>조회수</option>
+                            <option value="comment_count" {% if filters.sort_by == 'comment_count' %}selected{% endif %}>댓글수</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">정렬 순서</label>
+                        <select name="order" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="desc" {% if filters.sort_order == 'desc' %}selected{% endif %}>내림차순</option>
+                            <option value="asc" {% if filters.sort_order == 'asc' %}selected{% endif %}>오름차순</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 사이트 필터 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">사이트 필터</label>
+                    <div class="flex flex-wrap gap-3">
+                        {% for site in available_sites %}
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" name="site" value="{{ site }}"
+                                   {% if site in filters.sites %}checked{% endif %}
+                                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="ml-2 text-sm text-gray-700">{{ site }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- 버튼 -->
+                <div class="flex gap-3">
+                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        필터 적용
+                    </button>
+                    <a href="/game/{{ game.game_id }}" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
+                        필터 초기화
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- 게시글 목록 -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-gray-800">📝 게시글 목록</h2>
+                <span class="text-sm text-gray-500">총 {{ "{:,}".format(stats.total_posts) }}개</span>
+            </div>
+            
+            {% if posts %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">제목</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사이트</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작성일</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">조회수</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">댓글</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for post in posts %}
+                        <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/post/{{ post.url }}'">
+                            <td class="px-6 py-4">
+                                <div class="text-sm font-medium text-gray-900 truncate max-w-lg" title="{{ post.title }}">
+                                    {{ post.title[:60] }}{% if post.title|length > 60 %}...{% endif %}
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">{{ post.author or '익명' }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    {% if 'inven' in post.site %}bg-blue-100 text-blue-800
+                                    {% elif 'ruliweb' in post.site %}bg-green-100 text-green-800
+                                    {% elif 'dcinside' in post.site %}bg-yellow-100 text-yellow-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {{ post.site }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ post.created_at[:10] if post.created_at else '-' }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ "{:,}".format(post.view_count or 0) }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ post.comments|length if post.comments else 0 }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 페이지네이션 안내 -->
+            {% if posts|length >= 50 %}
+            <div class="mt-4 text-center text-sm text-gray-500">
+                더 많은 게시글을 보려면 API를 사용하세요: <code class="bg-gray-100 px-2 py-1 rounded">/api/game/{{ game.game_id }}/posts?limit=100&offset=50</code>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <div class="text-center py-12">
+                <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <p class="text-gray-500">필터 조건에 맞는 게시글이 없습니다.</p>
+                <a href="/game/{{ game.game_id }}" class="text-blue-600 hover:underline mt-2 inline-block">필터 초기화</a>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <!-- 푸터 -->
+    <footer class="bg-gray-800 text-white py-4 mt-8">
+        <div class="container mx-auto px-4 text-center">
+            <p>{{ game.name }} 커뮤니티 분석 대시보드</p>
+        </div>
+    </footer>
+
+    <!-- 감성 분석 JavaScript -->
+    <script>
+        let sentimentChart = null;
+        const gameId = '{{ game.game_id }}';
+        
+        // 현재 필터 조건 가져오기
+        function getCurrentFilters() {
+            const params = new URLSearchParams(window.location.search);
+            const filters = {};
+            
+            if (params.get('start_date')) filters.start_date = params.get('start_date');
+            if (params.get('end_date')) filters.end_date = params.get('end_date');
+            
+            const sites = params.getAll('site');
+            if (sites.length > 0) filters.sites = sites;
+            
+            return filters;
+        }
+        
+        // 감성 분석 데이터 로드
+        async function loadSentimentData() {
+            const loadingEl = document.getElementById('sentiment-loading');
+            const contentEl = document.getElementById('sentiment-content');
+            const errorEl = document.getElementById('sentiment-error');
+            
+            // 로딩 상태 표시
+            loadingEl.classList.remove('hidden');
+            contentEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+            
+            try {
+                // 필터 조건 적용
+                const filters = getCurrentFilters();
+                let url = `/api/game/${gameId}/sentiment`;
+                const params = new URLSearchParams();
+                
+                if (filters.start_date) params.append('start_date', filters.start_date);
+                if (filters.end_date) params.append('end_date', filters.end_date);
+                if (filters.sites) {
+                    filters.sites.forEach(site => params.append('site', site));
+                }
+                
+                if (params.toString()) {
+                    url += '?' + params.toString();
+                }
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('API 요청 실패');
+                
+                const data = await response.json();
+                
+                // 데이터 표시
+                displaySentimentData(data);
+                
+                // 로딩 완료
+                loadingEl.classList.add('hidden');
+                contentEl.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('감성 분석 데이터 로드 실패:', error);
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+            }
+        }
+        
+        // 감성 분석 데이터 표시
+        function displaySentimentData(data) {
+            const dist = data.sentiment_distribution;
+            const total = data.total_analyzed;
+            
+            // 평균 점수 표시
+            const avgEl = document.getElementById('sentiment-avg');
+            const avgLabelEl = document.getElementById('sentiment-avg-label');
+            avgEl.textContent = data.sentiment_avg.toFixed(2);
+            
+            // 평균 점수에 따른 레이블
+            let avgLabel = '중립';
+            if (data.sentiment_avg > 0.1) avgLabel = '긍정적';
+            else if (data.sentiment_avg < -0.1) avgLabel = '부정적';
+            avgLabelEl.textContent = avgLabel;
+            
+            // 색상 변경
+            if (data.sentiment_avg > 0.1) {
+                avgEl.classList.remove('text-indigo-700', 'text-red-700');
+                avgEl.classList.add('text-green-700');
+            } else if (data.sentiment_avg < -0.1) {
+                avgEl.classList.remove('text-indigo-700', 'text-green-700');
+                avgEl.classList.add('text-red-700');
+            }
+            
+            // 분포 수치 표시
+            document.getElementById('sentiment-positive').textContent = dist.positive.toLocaleString();
+            document.getElementById('sentiment-neutral').textContent = dist.neutral.toLocaleString();
+            document.getElementById('sentiment-negative').textContent = dist.negative.toLocaleString();
+            
+            // 백분율 계산 및 표시
+            const positivePct = total > 0 ? ((dist.positive / total) * 100).toFixed(1) : 0;
+            const neutralPct = total > 0 ? ((dist.neutral / total) * 100).toFixed(1) : 0;
+            const negativePct = total > 0 ? ((dist.negative / total) * 100).toFixed(1) : 0;
+            
+            document.getElementById('sentiment-positive-pct').textContent = `${positivePct}%`;
+            document.getElementById('sentiment-neutral-pct').textContent = `${neutralPct}%`;
+            document.getElementById('sentiment-negative-pct').textContent = `${negativePct}%`;
+            
+            // 바 차트 업데이트
+            document.getElementById('bar-positive').style.width = `${positivePct}%`;
+            document.getElementById('bar-neutral').style.width = `${neutralPct}%`;
+            document.getElementById('bar-negative').style.width = `${negativePct}%`;
+            document.getElementById('bar-positive-pct').textContent = `${positivePct}%`;
+            document.getElementById('bar-neutral-pct').textContent = `${neutralPct}%`;
+            document.getElementById('bar-negative-pct').textContent = `${negativePct}%`;
+            
+            // 도넛 차트 업데이트
+            updateSentimentChart(dist);
+            
+            // 부정적 게시글 목록 표시
+            displayNegativePosts(data.negative_posts);
+        }
+        
+        // 감성 분포 차트 업데이트
+        function updateSentimentChart(dist) {
+            const ctx = document.getElementById('sentiment-chart').getContext('2d');
+            
+            // 기존 차트 제거
+            if (sentimentChart) {
+                sentimentChart.destroy();
+            }
+            
+            // 새 차트 생성
+            sentimentChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['긍정', '중립', '부정'],
+                    datasets: [{
+                        data: [dist.positive, dist.neutral, dist.negative],
+                        backgroundColor: [
+                            'rgba(34, 197, 94, 0.8)',   // green-500
+                            'rgba(156, 163, 175, 0.8)', // gray-400
+                            'rgba(239, 68, 68, 0.8)'    // red-500
+                        ],
+                        borderColor: [
+                            'rgba(34, 197, 94, 1)',
+                            'rgba(156, 163, 175, 1)',
+                            'rgba(239, 68, 68, 1)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const value = context.raw;
+                                    const pct = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                    return `${context.label}: ${value.toLocaleString()}개 (${pct}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 부정적 게시글 목록 표시
+        function displayNegativePosts(posts) {
+            const listEl = document.getElementById('negative-posts-list');
+            const emptyEl = document.getElementById('negative-posts-empty');
+            
+            if (!posts || posts.length === 0) {
+                listEl.innerHTML = '';
+                emptyEl.classList.remove('hidden');
+                return;
+            }
+            
+            emptyEl.classList.add('hidden');
+            
+            listEl.innerHTML = posts.map(post => `
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 hover:bg-red-100 transition-colors cursor-pointer"
+                     onclick="window.location='/post/${encodeURIComponent(post.url)}'">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1 min-w-0">
+                            <h4 class="text-sm font-medium text-gray-900 truncate" title="${escapeHtml(post.title)}">
+                                ${escapeHtml(post.title.length > 60 ? post.title.substring(0, 60) + '...' : post.title)}
+                            </h4>
+                            <div class="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                                <span>${post.site}</span>
+                                <span>${post.created_at ? post.created_at.substring(0, 10) : '-'}</span>
+                                <span>조회 ${(post.view_count || 0).toLocaleString()}</span>
+                                <span>댓글 ${post.comment_count || 0}</span>
+                            </div>
+                        </div>
+                        <div class="ml-4 flex-shrink-0 text-right">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                ${post.sentiment_score.toFixed(2)}
+                            </span>
+                            <p class="text-xs text-gray-500 mt-1">신뢰도 ${(post.confidence * 100).toFixed(0)}%</p>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // HTML 이스케이프 함수
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // 페이지 로드 시 감성 분석 데이터 로드
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSentimentData();
+            loadHotPostsData();
+        });
+        
+        // Hot Post 데이터 로드 (게시글 기반)
+        async function loadHotPostsData() {
+            const loadingEl = document.getElementById('issues-loading');
+            const contentEl = document.getElementById('issues-content');
+            const errorEl = document.getElementById('issues-error');
+            
+            // 로딩 상태 표시
+            loadingEl.classList.remove('hidden');
+            contentEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+            
+            try {
+                // 필터 조건 적용
+                const filters = getCurrentFilters();
+                let url = `/api/game/${gameId}/hot-posts`;
+                const params = new URLSearchParams();
+                
+                if (filters.start_date) params.append('start_date', filters.start_date);
+                if (filters.end_date) params.append('end_date', filters.end_date);
+                if (filters.sites) {
+                    filters.sites.forEach(site => params.append('site', site));
+                }
+                params.append('limit', '30');
+                
+                if (params.toString()) {
+                    url += '?' + params.toString();
+                }
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('API 요청 실패');
+                
+                const data = await response.json();
+                
+                // 데이터 표시
+                displayHotPostsData(data);
+                
+                // Hot Post 배너 표시
+                if (data.alert_message) {
+                    displayHotPostBanner(data);
+                }
+                
+                // 로딩 완료
+                loadingEl.classList.add('hidden');
+                contentEl.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Hot Post 데이터 로드 실패:', error);
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+            }
+        }
+        
+        // Hot Post 데이터 표시
+        function displayHotPostsData(data) {
+            // 통계 표시
+            document.getElementById('issues-total').textContent = data.total_hot_posts.toLocaleString();
+            document.getElementById('issues-bug').textContent = data.bug_count.toLocaleString();
+            document.getElementById('issues-critical').textContent = data.critical_count.toLocaleString();
+            
+            // Hot Post 목록 표시
+            displayHotPostsList(data.hot_posts);
+        }
+        
+        // Hot Post 목록 테이블 표시
+        function displayHotPostsList(hotPosts) {
+            const listEl = document.getElementById('issues-list');
+            const emptyEl = document.getElementById('issues-empty');
+            
+            if (!hotPosts || hotPosts.length === 0) {
+                listEl.innerHTML = '';
+                emptyEl.classList.remove('hidden');
+                return;
+            }
+            
+            emptyEl.classList.add('hidden');
+            
+            // 테이블 생성
+            let tableHtml = `
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">제목</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">키워드</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hot Score</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">조회수</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">댓글</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">감성</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+            `;
+            
+            hotPosts.forEach((post, index) => {
+                // 상태 배지
+                let statusBadges = '';
+                if (post.hot_score >= 0.7) {
+                    statusBadges += '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 mr-1">🔥 HOT</span>';
+                } else if (post.hot_score >= 0.5) {
+                    statusBadges += '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800 mr-1">⚠️ 주목</span>';
+                }
+                if (post.is_bug) {
+                    statusBadges += `<span class="px-2 py-1 text-xs font-semibold rounded-full ${getSeverityColor(post.severity)} mr-1">🐛 ${post.severity.toUpperCase()}</span>`;
+                }
+                if (!statusBadges) {
+                    statusBadges = '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">일반</span>';
+                }
+                
+                // Hot Score 바
+                const hotScorePct = Math.min(100, post.hot_score * 100);
+                const hotScoreColor = post.hot_score >= 0.7 ? 'bg-red-500' : (post.hot_score >= 0.5 ? 'bg-orange-500' : 'bg-blue-500');
+                
+                // 감성 점수 색상
+                const sentimentColor = post.sentiment_score > 0.1 ? 'text-green-600' : (post.sentiment_score < -0.1 ? 'text-red-600' : 'text-gray-600');
+                
+                // 키워드 태그
+                const keywordTags = (post.keywords || []).slice(0, 3).map(kw => 
+                    `<span class="inline-block px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded mr-1 mb-1">${escapeHtml(kw)}</span>`
+                ).join('');
+                
+                // 행 배경색 (Hot Post는 강조)
+                const rowBg = post.hot_score >= 0.7 ? 'bg-red-50 hover:bg-red-100' : (post.hot_score >= 0.5 ? 'bg-orange-50 hover:bg-orange-100' : 'hover:bg-gray-50');
+                
+                // 제목 (클릭 가능)
+                const titlePreview = post.title.length > 50 ? post.title.substring(0, 50) + '...' : post.title;
+                
+                tableHtml += `
+                    <tr class="${rowBg} cursor-pointer" onclick="window.location='/post/${encodeURIComponent(post.post_url)}'">
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            ${statusBadges}
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="text-sm font-medium text-gray-900" title="${escapeHtml(post.title)}">${escapeHtml(titlePreview)}</div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                ${post.site} | ${post.author || '익명'} | ${post.created_at ? post.created_at.substring(0, 10) : '-'}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="flex flex-wrap max-w-xs">
+                                ${keywordTags || '<span class="text-xs text-gray-400">-</span>'}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                                    <div class="${hotScoreColor} h-2 rounded-full" style="width: ${hotScorePct}%"></div>
+                                </div>
+                                <span class="text-sm text-gray-600">${(post.hot_score * 100).toFixed(1)}%</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            ${(post.view_count || 0).toLocaleString()}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            ${(post.comment_count || 0).toLocaleString()}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="text-sm font-medium ${sentimentColor}">
+                                ${post.sentiment_score > 0 ? '+' : ''}${post.sentiment_score.toFixed(2)}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tableHtml += `
+                    </tbody>
+                </table>
+            `;
+            
+            listEl.innerHTML = tableHtml;
+        }
+        
+        // 심각도에 따른 색상 반환
+        function getSeverityColor(severity) {
+            switch (severity) {
+                case 'critical': return 'bg-red-200 text-red-900';
+                case 'high': return 'bg-orange-200 text-orange-900';
+                case 'medium': return 'bg-yellow-200 text-yellow-900';
+                case 'low': return 'bg-green-200 text-green-900';
+                default: return 'bg-gray-200 text-gray-900';
+            }
+        }
+        
+        // Hot Post 배너 표시
+        function displayHotPostBanner(data) {
+            const bannerEl = document.getElementById('hot-issue-banner');
+            const messageEl = document.getElementById('hot-issue-message');
+            const detailEl = document.getElementById('hot-issue-detail');
+            const postsEl = document.getElementById('hot-issue-posts');
+            
+            // 배너가 이미 닫혔는지 확인 (세션 스토리지)
+            const dismissedKey = `hot_post_dismissed_${gameId}`;
+            if (sessionStorage.getItem(dismissedKey)) {
+                return;
+            }
+            
+            // 메시지 설정
+            if (data.alert_message) {
+                messageEl.textContent = data.alert_message;
+            } else if (data.total_hot_posts > 0) {
+                messageEl.textContent = `🔥 ${data.total_hot_posts}개의 주목할 게시글이 있습니다!`;
+            } else {
+                return; // 표시할 내용 없음
+            }
+            
+            // 상세 정보 설정
+            if (data.hot_posts && data.hot_posts.length > 0) {
+                const topPost = data.hot_posts[0];
+                detailEl.textContent = `조회수 ${(topPost.view_count || 0).toLocaleString()} | 댓글 ${topPost.comment_count || 0}개 | 감성 점수 ${topPost.sentiment_score.toFixed(2)}`;
+                
+                // 관련 게시글 링크 표시
+                postsEl.classList.remove('hidden');
+                postsEl.innerHTML = `
+                    <span class="text-red-200">Hot Posts:</span>
+                    ${data.hot_posts.slice(0, 3).map(post => `
+                        <a href="/post/${encodeURIComponent(post.post_url)}" 
+                           class="px-2 py-0.5 bg-red-500 bg-opacity-30 rounded hover:bg-opacity-50 transition-colors truncate max-w-xs"
+                           title="${escapeHtml(post.title)}">
+                            ${escapeHtml(post.title.length > 30 ? post.title.substring(0, 30) + '...' : post.title)}
+                        </a>
+                    `).join('')}
+                `;
+            }
+            
+            // 배너 표시
+            bannerEl.classList.remove('hidden');
+        }
+        
+        // Hot Issue 배너 닫기
+        function dismissHotIssueBanner() {
+            const bannerEl = document.getElementById('hot-issue-banner');
+            bannerEl.classList.add('hidden');
+            
+            // 세션 스토리지에 닫힘 상태 저장
+            const dismissedKey = `hot_post_dismissed_${gameId}`;
+            sessionStorage.setItem(dismissedKey, 'true');
+        }
+        
+        // 이슈 섹션으로 스크롤
+        function scrollToIssues() {
+            const issuesSection = document.getElementById('issues-section');
+            if (issuesSection) {
+                issuesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+        
+        // 페이지 로드 시 데이터 로드
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSentimentData();
+            loadTrendData();
+            loadHotPostsData();
+        });
+        
+        // 트렌드 차트 인스턴스
+        let sentimentTrendChart = null;
+        let keywordTrendChart = null;
+        
+        // 트렌드 데이터 로드
+        async function loadTrendData() {
+            const loadingEl = document.getElementById('trend-loading');
+            const contentEl = document.getElementById('trend-content');
+            const errorEl = document.getElementById('trend-error');
+            
+            // 로딩 상태 표시
+            loadingEl.classList.remove('hidden');
+            contentEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+            
+            try {
+                // 필터 조건 적용
+                const filters = getCurrentFilters();
+                const period = document.getElementById('trend-period').value;
+                let url = `/api/game/${gameId}/sentiment/trend`;
+                const params = new URLSearchParams();
+                
+                if (filters.start_date) params.append('start_date', filters.start_date);
+                if (filters.end_date) params.append('end_date', filters.end_date);
+                if (filters.sites) {
+                    filters.sites.forEach(site => params.append('site', site));
+                }
+                params.append('period', period);
+                
+                if (params.toString()) {
+                    url += '?' + params.toString();
+                }
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('API 요청 실패');
+                
+                const data = await response.json();
+                
+                // 데이터 표시
+                displayTrendData(data);
+                
+                // 로딩 완료
+                loadingEl.classList.add('hidden');
+                contentEl.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('트렌드 데이터 로드 실패:', error);
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+            }
+        }
+        
+        // 트렌드 데이터 표시
+        function displayTrendData(data) {
+            const summary = data.summary;
+            
+            // 요약 정보 표시
+            document.getElementById('trend-avg').textContent = summary.avg_value.toFixed(2);
+            document.getElementById('trend-max').textContent = summary.max_value.toFixed(2);
+            document.getElementById('trend-min').textContent = summary.min_value.toFixed(2);
+            
+            // 기간 정보
+            if (summary.start_date && summary.end_date) {
+                const startDate = summary.start_date.substring(0, 10);
+                const endDate = summary.end_date.substring(0, 10);
+                document.getElementById('trend-period-info').textContent = `${startDate} ~ ${endDate}`;
+            } else {
+                document.getElementById('trend-period-info').textContent = '-';
+            }
+            
+            // 평균 감성에 따른 색상 변경
+            const avgEl = document.getElementById('trend-avg');
+            avgEl.classList.remove('text-indigo-700', 'text-green-700', 'text-red-700');
+            if (summary.avg_value > 0.1) {
+                avgEl.classList.add('text-green-700');
+            } else if (summary.avg_value < -0.1) {
+                avgEl.classList.add('text-red-700');
+            } else {
+                avgEl.classList.add('text-indigo-700');
+            }
+            
+            // 트렌드 차트 업데이트
+            updateSentimentTrendChart(data.trend);
+            
+            // 부정적 감성 급증 알림
+            displaySpikeAlert(data.spikes);
+        }
+        
+        // 감성 트렌드 차트 업데이트
+        function updateSentimentTrendChart(trend) {
+            const ctx = document.getElementById('sentiment-trend-chart').getContext('2d');
+            
+            // 기존 차트 제거
+            if (sentimentTrendChart) {
+                sentimentTrendChart.destroy();
+            }
+            
+            const labels = trend.data_points.map(p => p.date);
+            const values = trend.data_points.map(p => p.value);
+            const counts = trend.data_points.map(p => p.count);
+            
+            // 색상 배열 생성 (값에 따라)
+            const backgroundColors = values.map(v => {
+                if (v > 0.1) return 'rgba(34, 197, 94, 0.6)';  // 긍정 - 녹색
+                if (v < -0.1) return 'rgba(239, 68, 68, 0.6)'; // 부정 - 빨간색
+                return 'rgba(156, 163, 175, 0.6)';             // 중립 - 회색
+            });
+            
+            const borderColors = values.map(v => {
+                if (v > 0.1) return 'rgba(34, 197, 94, 1)';
+                if (v < -0.1) return 'rgba(239, 68, 68, 1)';
+                return 'rgba(156, 163, 175, 1)';
+            });
+            
+            // 새 차트 생성
+            sentimentTrendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '감성 점수',
+                        data: values,
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: backgroundColors,
+                        pointBorderColor: borderColors,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const idx = context.dataIndex;
+                                    const value = context.raw;
+                                    const count = counts[idx];
+                                    let label = value > 0.1 ? '긍정' : (value < -0.1 ? '부정' : '중립');
+                                    return `감성 점수: ${value.toFixed(3)} (${label}) | 게시글: ${count}개`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            min: -1,
+                            max: 1,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(1);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 부정적 감성 급증 알림 표시
+        function displaySpikeAlert(spikes) {
+            const alertEl = document.getElementById('spike-alert');
+            const messageEl = document.getElementById('spike-message');
+            const datesEl = document.getElementById('spike-dates');
+            
+            if (!spikes || spikes.length === 0) {
+                alertEl.classList.add('hidden');
+                return;
+            }
+            
+            alertEl.classList.remove('hidden');
+            messageEl.textContent = `${spikes.length}개 날짜에서 부정적 감성 급증이 탐지되었습니다. (감성 점수 -0.3 미만)`;
+            
+            datesEl.innerHTML = spikes.map(spike => `
+                <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
+                    ${spike.date}: ${spike.value.toFixed(2)} (${spike.count}개)
+                </span>
+            `).join('');
+        }
+        
+        // 키워드 트렌드 로드
+        async function loadKeywordTrend() {
+            const keyword = document.getElementById('keyword-search').value.trim();
+            if (!keyword) {
+                alert('키워드를 입력해주세요.');
+                return;
+            }
+            
+            const containerEl = document.getElementById('keyword-trend-container');
+            const titleEl = document.getElementById('keyword-trend-title');
+            
+            try {
+                // 필터 조건 적용
+                const filters = getCurrentFilters();
+                const period = document.getElementById('trend-period').value;
+                let url = `/api/game/${gameId}/keyword/${encodeURIComponent(keyword)}/trend`;
+                const params = new URLSearchParams();
+                
+                if (filters.start_date) params.append('start_date', filters.start_date);
+                if (filters.end_date) params.append('end_date', filters.end_date);
+                if (filters.sites) {
+                    filters.sites.forEach(site => params.append('site', site));
+                }
+                params.append('period', period);
+                
+                if (params.toString()) {
+                    url += '?' + params.toString();
+                }
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('API 요청 실패');
+                
+                const data = await response.json();
+                
+                // 컨테이너 표시
+                containerEl.classList.remove('hidden');
+                titleEl.textContent = `"${keyword}" 키워드 언급 빈도`;
+                
+                // 차트 업데이트
+                updateKeywordTrendChart(data.trend);
+                
+            } catch (error) {
+                console.error('키워드 트렌드 로드 실패:', error);
+                alert('키워드 트렌드를 불러오는데 실패했습니다.');
+            }
+        }
+        
+        // 키워드 트렌드 차트 업데이트
+        function updateKeywordTrendChart(trend) {
+            const ctx = document.getElementById('keyword-trend-chart').getContext('2d');
+            
+            // 기존 차트 제거
+            if (keywordTrendChart) {
+                keywordTrendChart.destroy();
+            }
+            
+            const labels = trend.data_points.map(p => p.date);
+            const values = trend.data_points.map(p => p.value);
+            
+            // 새 차트 생성
+            keywordTrendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '언급 횟수',
+                        data: values,
+                        backgroundColor: 'rgba(99, 102, 241, 0.6)',
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `언급 횟수: ${context.raw}회`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 키워드 검색 엔터키 지원
+        document.getElementById('keyword-search').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                loadKeywordTrend();
+            }
+        });
+    </script>
+</body>
+</html>
