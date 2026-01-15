@@ -1,0 +1,130 @@
+{
+  "game_id": "test-game",
+  "analyzed_at": "2026-01-15T13:12:54.889543",
+  "total_posts": 1,
+  "total_comments": 0,
+  "sentiment_distribution": {
+    "positive": 1,
+    "negative": 0,
+    "neutral": 0
+  },
+  "sentiment_avg": 1.0,
+  "issues": [
+    {
+      "issue_id": "issue_37063eef",
+      "title": "리뷰",
+      "cluster": {
+        "cluster_id": "cluster_0",
+        "keywords": [
+          "리뷰"
+        ],
+        "representative": "리뷰",
+        "post_count": 1,
+        "total_views": 100,
+        "total_comments": 0
+      },
+      "priority_score": 0.7,
+      "is_hot": true,
+      "is_bug": false,
+      "severity": "low",
+      "related_posts": [
+        "https://example.com/post1"
+      ],
+      "first_seen": "2026-01-15T13:12:54.878307",
+      "sentiment_avg": 1.0
+    },
+    {
+      "issue_id": "issue_b0945d1a",
+      "title": "재미있는",
+      "cluster": {
+        "cluster_id": "cluster_1",
+        "keywords": [
+          "재미있는",
+          "재미",
+          "미있",
+          "재미있",
+          "미있는"
+        ],
+        "representative": "재미있는",
+        "post_count": 1,
+        "total_views": 100,
+        "total_comments": 0
+      },
+      "priority_score": 0.7,
+      "is_hot": false,
+      "is_bug": false,
+      "severity": "low",
+      "related_posts": [
+        "https://example.com/post1"
+      ],
+      "first_seen": "2026-01-15T13:12:54.878307",
+      "sentiment_avg": 1.0
+    },
+    {
+      "issue_id": "issue_3fef993f",
+      "title": "게임입니다",
+      "cluster": {
+        "cluster_id": "cluster_2",
+        "keywords": [
+          "게임입니다",
+          "임입",
+          "입니",
+          "니다",
+          "게임입",
+          "임입니",
+          "입니다"
+        ],
+        "representative": "게임입니다",
+        "post_count": 1,
+        "total_views": 100,
+        "total_comments": 0
+      },
+      "priority_score": 0.7,
+      "is_hot": false,
+      "is_bug": false,
+      "severity": "low",
+      "related_posts": [
+        "https://example.com/post1"
+      ],
+      "first_seen": "2026-01-15T13:12:54.878307",
+      "sentiment_avg": 1.0
+    }
+  ],
+  "hot_issues": [
+    {
+      "issue_id": "issue_37063eef",
+      "title": "리뷰",
+      "cluster": {
+        "cluster_id": "cluster_0",
+        "keywords": [
+          "리뷰"
+        ],
+        "representative": "리뷰",
+        "post_count": 1,
+        "total_views": 100,
+        "total_comments": 0
+      },
+      "priority_score": 0.7,
+      "is_hot": true,
+      "is_bug": false,
+      "severity": "low",
+      "related_posts": [
+        "https://example.com/post1"
+      ],
+      "first_seen": "2026-01-15T13:12:54.878307",
+      "sentiment_avg": 1.0
+    }
+  ],
+  "bug_issues": [],
+  "sentiment_trend": {
+    "metric_name": "sentiment",
+    "period": "daily",
+    "data_points": [
+      {
+        "date": "2026-01-15T00:00:00",
+        "value": 1.0,
+        "count": 1
+      }
+    ]
+  }
+}

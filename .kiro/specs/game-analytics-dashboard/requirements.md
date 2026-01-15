@@ -112,3 +112,18 @@
 3. WHEN 알림을 표시한다 THEN Game_Analytics_Dashboard SHALL 이슈 요약과 관련 게시글 링크를 포함한다
 4. IF 24시간 내 동일 이슈에 대한 게시글이 10개 이상 발생한다 THEN Game_Analytics_Dashboard SHALL 긴급 알림으로 분류한다
 
+### Requirement 9: 대시보드 크롤링 관리
+
+**User Story:** As a 게임 운영자, I want to 대시보드에서 직접 크롤링을 시작하고 관리하고 싶다, so that 별도의 스크립트 실행 없이 데이터를 수집하고 갱신할 수 있다.
+
+#### Acceptance Criteria
+
+1. WHEN 새 게임을 등록한다 THEN Game_Analytics_Dashboard SHALL 게임명, 키워드, 대상 사이트를 입력받아 GameProfile을 생성한다
+2. WHEN 크롤링 시작 버튼을 클릭한다 THEN Game_Analytics_Dashboard SHALL 해당 게임의 크롤링을 백그라운드에서 실행한다
+3. WHEN 크롤링이 진행 중이다 THEN Game_Analytics_Dashboard SHALL 진행 상태(검색 중/크롤링 중/완료)를 표시한다
+4. WHEN 크롤링이 완료된다 THEN Game_Analytics_Dashboard SHALL 결과 요약(수집 게시글 수, 성공률, 소요시간)을 표시한다
+5. WHEN 데이터 갱신 버튼을 클릭한다 THEN Game_Analytics_Dashboard SHALL 기존 게임의 최신 데이터를 재크롤링한다
+6. WHEN 등록된 게임 목록을 조회한다 THEN Game_Analytics_Dashboard SHALL 각 게임의 마지막 크롤링 시간과 데이터 수를 표시한다
+7. WHEN 게임 프로필을 수정한다 THEN Game_Analytics_Dashboard SHALL 키워드, 대상 사이트를 변경할 수 있다
+8. WHEN 게임을 삭제한다 THEN Game_Analytics_Dashboard SHALL 해당 게임의 프로필과 크롤링 데이터를 삭제한다
+

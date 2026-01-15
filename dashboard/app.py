@@ -390,9 +390,10 @@ def get_available_sites(posts):
 def game_dashboard(game_id):
     """게임별 상세 대시보드 페이지
     
-    Requirements: 1.3, 5.2
+    Requirements: 1.3, 5.2, 5.3
     - 게임별 게시글 목록 표시
     - 기본 필터 UI (기간, 사이트)
+    - 감성 분석 필터 (sentiment, issue_type, sentiment_min, sentiment_max)
     
     Args:
         game_id: 게임 ID (kebab-case)
@@ -414,6 +415,12 @@ def game_dashboard(game_id):
     sort_by = request.args.get('sort', 'created_at')
     sort_order = request.args.get('order', 'desc')
     
+    # 감성 분석 필터 파라미터 (Requirement 5.3)
+    sentiment_filter = request.args.get('sentiment', '')  # positive, negative, neutral
+    issue_type_filter = request.args.getlist('issue_type')  # bug, balance, server, etc.
+    sentiment_min = request.args.get('sentiment_min', type=float)  # -1.0 ~ 1.0
+    sentiment_max = request.args.get('sentiment_max', type=float)  # -1.0 ~ 1.0
+    
     # 필터 적용
     filtered_posts = game_posts
     if start_date or end_date:
@@ -421,16 +428,45 @@ def game_dashboard(game_id):
     if site_filter:
         filtered_posts = filter_posts_by_site(filtered_posts, site_filter)
     
+    # 감성 분석 필터 적용 (Requirement 5.3)
+    if sentiment_filter:
+        filtered_posts = [p for p in filtered_posts 
+                        if p.get('analysis', {}).get('sentiment', {}).get('label') == sentiment_filter]
+    
+    if issue_type_filter:
+        filtered_posts = [p for p in filtered_posts 
+                        if any(issue.get('type') in issue_type_filter 
+                              for issue in p.get('analysis', {}).get('issues', []))]
+    
+    if sentiment_min is not None:
+        filtered_posts = [p for p in filtered_posts 
+                        if p.get('analysis', {}).get('sentiment', {}).get('score', 0) >= sentiment_min]
+    
+    if sentiment_max is not None:
+        filtered_posts = [p for p in filtered_posts 
+                        if p.get('analysis', {}).get('sentiment', {}).get('score', 0) <= sentiment_max]
+    
     # 정렬
     if sort_by == 'view_count':
         filtered_posts = sorted(filtered_posts, key=lambda x: x.get('view_count', 0) or 0, reverse=(sort_order == 'desc'))
     elif sort_by == 'comment_count':
         filtered_posts = sorted(filtered_posts, key=lambda x: len(x.get('comments', [])), reverse=(sort_order == 'desc'))
+    elif sort_by == 'sentiment':
+        filtered_posts = sorted(filtered_posts, 
+                               key=lambda x: x.get('analysis', {}).get('sentiment', {}).get('score', 0), 
+                               reverse=(sort_order == 'desc'))
     else:  # created_at
         filtered_posts = sorted(filtered_posts, key=lambda x: x.get('created_at', '') or '', reverse=(sort_order == 'desc'))
     
     # 사용 가능한 사이트 목록
     available_sites = get_available_sites(game_posts)
+    
+    # 사용 가능한 이슈 타입 목록 추출
+    available_issue_types = set()
+    for p in game_posts:
+        for issue in p.get('analysis', {}).get('issues', []):
+            if issue.get('type'):
+                available_issue_types.add(issue.get('type'))
     
     # 통계 계산
     stats = {
@@ -439,18 +475,31 @@ def game_dashboard(game_id):
         'total_comments': sum(len(p.get('comments', [])) for p in filtered_posts)
     }
     
+    # 감성 분석 통계 추가
+    sentiment_stats = {'positive': 0, 'negative': 0, 'neutral': 0}
+    for p in filtered_posts:
+        label = p.get('analysis', {}).get('sentiment', {}).get('label', 'neutral')
+        if label in sentiment_stats:
+            sentiment_stats[label] += 1
+    stats['sentiment'] = sentiment_stats
+    
     return render_template(
         'game_dashboard.html',
         game=game_info,
         posts=filtered_posts,
         stats=stats,
         available_sites=available_sites,
+        available_issue_types=sorted(available_issue_types),
         filters={
             'start_date': start_date,
             'end_date': end_date,
             'sites': site_filter,
             'sort_by': sort_by,
-            'sort_order': sort_order
+            'sort_order': sort_order,
+            'sentiment': sentiment_filter,
+            'issue_types': issue_type_filter,
+            'sentiment_min': sentiment_min,
+            'sentiment_max': sentiment_max
         }
     )
 
@@ -459,9 +508,10 @@ def game_dashboard(game_id):
 def api_game_posts(game_id):
     """게임별 게시글 목록 API
     
-    Requirements: 1.3, 5.2
+    Requirements: 1.3, 5.2, 5.3
     - 게임별 게시글 목록 조회
     - 기간, 사이트 필터링 지원
+    - 감성 분석 필터링 지원
     
     Args:
         game_id: 게임 ID (kebab-case)
@@ -470,10 +520,14 @@ def api_game_posts(game_id):
         start_date: 시작일 (YYYY-MM-DD)
         end_date: 종료일 (YYYY-MM-DD)
         site: 사이트 필터 (복수 가능)
-        sort: 정렬 필드 (created_at, view_count, comment_count)
+        sort: 정렬 필드 (created_at, view_count, comment_count, sentiment)
         order: 정렬 순서 (asc, desc)
         limit: 결과 제한 수
         offset: 시작 위치
+        sentiment: 감성 필터 (positive, negative, neutral)
+        issue_type: 이슈 타입 필터 (복수 가능)
+        sentiment_min: 최소 감성 점수 (-1.0 ~ 1.0)
+        sentiment_max: 최대 감성 점수 (-1.0 ~ 1.0)
         
     Returns:
         JSON: {posts: [...], total: n, game: {...}}
@@ -497,6 +551,12 @@ def api_game_posts(game_id):
     limit = request.args.get('limit', type=int)
     offset = request.args.get('offset', 0, type=int)
     
+    # 감성 분석 필터 파라미터 (Requirement 5.3)
+    sentiment_filter = request.args.get('sentiment', '')
+    issue_type_filter = request.args.getlist('issue_type')
+    sentiment_min = request.args.get('sentiment_min', type=float)
+    sentiment_max = request.args.get('sentiment_max', type=float)
+    
     # 필터 적용
     filtered_posts = game_posts
     if start_date or end_date:
@@ -504,11 +564,33 @@ def api_game_posts(game_id):
     if site_filter:
         filtered_posts = filter_posts_by_site(filtered_posts, site_filter)
     
+    # 감성 분석 필터 적용 (Requirement 5.3)
+    if sentiment_filter:
+        filtered_posts = [p for p in filtered_posts 
+                        if p.get('analysis', {}).get('sentiment', {}).get('label') == sentiment_filter]
+    
+    if issue_type_filter:
+        filtered_posts = [p for p in filtered_posts 
+                        if any(issue.get('type') in issue_type_filter 
+                              for issue in p.get('analysis', {}).get('issues', []))]
+    
+    if sentiment_min is not None:
+        filtered_posts = [p for p in filtered_posts 
+                        if p.get('analysis', {}).get('sentiment', {}).get('score', 0) >= sentiment_min]
+    
+    if sentiment_max is not None:
+        filtered_posts = [p for p in filtered_posts 
+                        if p.get('analysis', {}).get('sentiment', {}).get('score', 0) <= sentiment_max]
+    
     # 정렬
     if sort_by == 'view_count':
         filtered_posts = sorted(filtered_posts, key=lambda x: x.get('view_count', 0) or 0, reverse=(sort_order == 'desc'))
     elif sort_by == 'comment_count':
         filtered_posts = sorted(filtered_posts, key=lambda x: len(x.get('comments', [])), reverse=(sort_order == 'desc'))
+    elif sort_by == 'sentiment':
+        filtered_posts = sorted(filtered_posts, 
+                               key=lambda x: x.get('analysis', {}).get('sentiment', {}).get('score', 0), 
+                               reverse=(sort_order == 'desc'))
     else:  # created_at
         filtered_posts = sorted(filtered_posts, key=lambda x: x.get('created_at', '') or '', reverse=(sort_order == 'desc'))
     
@@ -520,10 +602,10 @@ def api_game_posts(game_id):
     elif offset:
         filtered_posts = filtered_posts[offset:]
     
-    # 응답 데이터 구성
+    # 응답 데이터 구성 (감성 분석 정보 포함)
     response_posts = []
     for post in filtered_posts:
-        response_posts.append({
+        post_data = {
             'url': post.get('url', ''),
             'title': post.get('title', ''),
             'author': post.get('author', ''),
@@ -533,7 +615,13 @@ def api_game_posts(game_id):
             'comment_count': len(post.get('comments', [])),
             'site': post.get('site', ''),
             'keyword': post.get('keyword', '')
-        })
+        }
+        # 감성 분석 정보 추가
+        analysis = post.get('analysis', {})
+        if analysis:
+            post_data['sentiment'] = analysis.get('sentiment', {})
+            post_data['issues'] = analysis.get('issues', [])
+        response_posts.append(post_data)
     
     return jsonify({
         'posts': response_posts,
@@ -544,7 +632,11 @@ def api_game_posts(game_id):
             'end_date': end_date,
             'sites': site_filter,
             'sort_by': sort_by,
-            'sort_order': sort_order
+            'sort_order': sort_order,
+            'sentiment': sentiment_filter,
+            'issue_types': issue_type_filter,
+            'sentiment_min': sentiment_min,
+            'sentiment_max': sentiment_max
         }
     })
 
@@ -1781,6 +1873,288 @@ def api_game_keyword_trend(game_id, keyword):
             'end_date': end_date_str,
             'sites': site_filter,
             'period': period
+        }
+    })
+
+
+# 알림 관리자 인스턴스 (싱글톤)
+_alert_manager = None
+
+def get_alert_manager():
+    """알림 관리자 인스턴스 반환 (싱글톤 패턴)"""
+    global _alert_manager
+    if _alert_manager is None:
+        from crawler.analysis.alert_manager import AlertManager
+        _alert_manager = AlertManager(
+            sentiment_analyzer=get_sentiment_analyzer(),
+            issue_detector=get_issue_detector(),
+            trend_analyzer=get_trend_analyzer()
+        )
+    return _alert_manager
+
+
+@app.route('/api/game/<game_id>/alerts')
+def api_game_alerts(game_id):
+    """게임별 알림 목록 API
+    
+    Requirements: 8.1, 8.2, 8.3
+    - Hot Issue 알림
+    - 부정적 감성 급증 알림
+    - 긴급 알림
+    - 이슈 요약과 관련 게시글 링크 포함
+    
+    Args:
+        game_id: 게임 ID (kebab-case)
+        
+    Query Parameters:
+        start_date: 시작일 (YYYY-MM-DD)
+        end_date: 종료일 (YYYY-MM-DD)
+        site: 사이트 필터 (복수 가능)
+        include_hot_issues: Hot Issue 알림 포함 (기본값: true)
+        include_sentiment_spikes: 감성 급증 알림 포함 (기본값: true)
+        include_urgent: 긴급 알림 포함 (기본값: true)
+        
+    Returns:
+        JSON: {
+            game: {...},
+            alerts: [{alert_id, alert_type, priority, title, message, ...}, ...],
+            summary: {
+                total_alerts: int,
+                urgent_count: int,
+                hot_issue_count: int,
+                sentiment_spike_count: int,
+                critical_count: int,
+                top_alert: {...}
+            },
+            filters: {...}
+        }
+    """
+    posts = load_crawl_data()
+    
+    # 게임 정보 조회
+    game_info = get_game_info(posts, game_id)
+    if not game_info:
+        return jsonify({'error': 'Game not found'}), 404
+    
+    # 게임별 게시글 필터링
+    game_posts = filter_posts_by_game(posts, game_id)
+    
+    # 쿼리 파라미터에서 필터 조건 추출
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    site_filter = request.args.getlist('site')
+    include_hot_issues = request.args.get('include_hot_issues', 'true').lower() == 'true'
+    include_sentiment_spikes = request.args.get('include_sentiment_spikes', 'true').lower() == 'true'
+    include_urgent = request.args.get('include_urgent', 'true').lower() == 'true'
+    
+    # 필터 적용
+    filtered_posts = game_posts
+    if start_date or end_date:
+        filtered_posts = filter_posts_by_date_range(filtered_posts, start_date, end_date)
+    if site_filter:
+        filtered_posts = filter_posts_by_site(filtered_posts, site_filter)
+    
+    # PostContent 객체로 변환
+    post_contents = [convert_post_dict_to_postcontent(p) for p in filtered_posts]
+    
+    # 알림 생성
+    manager = get_alert_manager()
+    alerts = manager.generate_alerts(
+        posts=post_contents,
+        game_id=game_id,
+        include_hot_issues=include_hot_issues,
+        include_sentiment_spikes=include_sentiment_spikes,
+        include_urgent=include_urgent
+    )
+    
+    # 요약 정보 생성
+    summary = manager.get_alerts_summary(alerts)
+    
+    return jsonify({
+        'game': game_info,
+        'alerts': summary['alerts'],
+        'summary': {
+            'total_alerts': summary['total_alerts'],
+            'urgent_count': summary['urgent_count'],
+            'hot_issue_count': summary['hot_issue_count'],
+            'sentiment_spike_count': summary['sentiment_spike_count'],
+            'critical_count': summary['critical_count'],
+            'top_alert': summary['top_alert']
+        },
+        'filters': {
+            'start_date': start_date,
+            'end_date': end_date,
+            'sites': site_filter,
+            'include_hot_issues': include_hot_issues,
+            'include_sentiment_spikes': include_sentiment_spikes,
+            'include_urgent': include_urgent
+        }
+    })
+
+
+@app.route('/api/game/<game_id>/alerts/urgent')
+def api_game_urgent_alerts(game_id):
+    """게임별 긴급 알림 목록 API
+    
+    Requirements: 8.4
+    - 24시간 내 동일 이슈에 대한 게시글이 10개 이상인 긴급 알림만 반환
+    
+    Args:
+        game_id: 게임 ID (kebab-case)
+        
+    Query Parameters:
+        start_date: 시작일 (YYYY-MM-DD)
+        end_date: 종료일 (YYYY-MM-DD)
+        site: 사이트 필터 (복수 가능)
+        
+    Returns:
+        JSON: {
+            game: {...},
+            urgent_alerts: [{alert_id, alert_type, priority, title, message, ...}, ...],
+            total_urgent: int,
+            alert_banner: str (긴급 알림 배너 메시지)
+        }
+    """
+    posts = load_crawl_data()
+    
+    # 게임 정보 조회
+    game_info = get_game_info(posts, game_id)
+    if not game_info:
+        return jsonify({'error': 'Game not found'}), 404
+    
+    # 게임별 게시글 필터링
+    game_posts = filter_posts_by_game(posts, game_id)
+    
+    # 쿼리 파라미터에서 필터 조건 추출
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    site_filter = request.args.getlist('site')
+    
+    # 필터 적용
+    filtered_posts = game_posts
+    if start_date or end_date:
+        filtered_posts = filter_posts_by_date_range(filtered_posts, start_date, end_date)
+    if site_filter:
+        filtered_posts = filter_posts_by_site(filtered_posts, site_filter)
+    
+    # PostContent 객체로 변환
+    post_contents = [convert_post_dict_to_postcontent(p) for p in filtered_posts]
+    
+    # 알림 생성 (긴급 알림만)
+    manager = get_alert_manager()
+    alerts = manager.generate_alerts(
+        posts=post_contents,
+        game_id=game_id,
+        include_hot_issues=False,
+        include_sentiment_spikes=False,
+        include_urgent=True
+    )
+    
+    # 긴급 알림만 필터링
+    urgent_alerts = manager.get_urgent_alerts(alerts)
+    
+    # 알림 배너 메시지 생성
+    alert_banner = None
+    if urgent_alerts:
+        top_alert = urgent_alerts[0]
+        alert_banner = top_alert.message
+    
+    return jsonify({
+        'game': game_info,
+        'urgent_alerts': [a.to_dict() for a in urgent_alerts],
+        'total_urgent': len(urgent_alerts),
+        'alert_banner': alert_banner,
+        'filters': {
+            'start_date': start_date,
+            'end_date': end_date,
+            'sites': site_filter
+        }
+    })
+
+
+@app.route('/api/game/<game_id>/alerts/sentiment-spikes')
+def api_game_sentiment_spike_alerts(game_id):
+    """게임별 부정적 감성 급증 알림 API
+    
+    Requirements: 8.2
+    - 부정적 감성 급증이 탐지되면 경고 알림 반환
+    
+    Args:
+        game_id: 게임 ID (kebab-case)
+        
+    Query Parameters:
+        start_date: 시작일 (YYYY-MM-DD)
+        end_date: 종료일 (YYYY-MM-DD)
+        site: 사이트 필터 (복수 가능)
+        threshold: 부정적 감성 임계값 (기본값: -0.3)
+        
+    Returns:
+        JSON: {
+            game: {...},
+            spike_alerts: [{alert_id, alert_type, priority, title, message, ...}, ...],
+            total_spikes: int,
+            warning_banner: str (경고 배너 메시지)
+        }
+    """
+    from crawler.analysis.alert_manager import AlertType
+    
+    posts = load_crawl_data()
+    
+    # 게임 정보 조회
+    game_info = get_game_info(posts, game_id)
+    if not game_info:
+        return jsonify({'error': 'Game not found'}), 404
+    
+    # 게임별 게시글 필터링
+    game_posts = filter_posts_by_game(posts, game_id)
+    
+    # 쿼리 파라미터에서 필터 조건 추출
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    site_filter = request.args.getlist('site')
+    threshold = request.args.get('threshold', -0.3, type=float)
+    
+    # 필터 적용
+    filtered_posts = game_posts
+    if start_date or end_date:
+        filtered_posts = filter_posts_by_date_range(filtered_posts, start_date, end_date)
+    if site_filter:
+        filtered_posts = filter_posts_by_site(filtered_posts, site_filter)
+    
+    # PostContent 객체로 변환
+    post_contents = [convert_post_dict_to_postcontent(p) for p in filtered_posts]
+    
+    # 알림 생성 (감성 급증 알림만)
+    manager = get_alert_manager()
+    manager.SENTIMENT_SPIKE_THRESHOLD = threshold
+    
+    alerts = manager.generate_alerts(
+        posts=post_contents,
+        game_id=game_id,
+        include_hot_issues=False,
+        include_sentiment_spikes=True,
+        include_urgent=False
+    )
+    
+    # 감성 급증 알림만 필터링
+    spike_alerts = manager.get_alerts_by_type(AlertType.SENTIMENT_SPIKE, alerts)
+    
+    # 경고 배너 메시지 생성
+    warning_banner = None
+    if spike_alerts:
+        top_alert = spike_alerts[0]
+        warning_banner = f"⚠️ {top_alert.message}"
+    
+    return jsonify({
+        'game': game_info,
+        'spike_alerts': [a.to_dict() for a in spike_alerts],
+        'total_spikes': len(spike_alerts),
+        'warning_banner': warning_banner,
+        'filters': {
+            'start_date': start_date,
+            'end_date': end_date,
+            'sites': site_filter,
+            'threshold': threshold
         }
     })
 

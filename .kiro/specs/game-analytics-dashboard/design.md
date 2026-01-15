@@ -11,6 +11,8 @@ graph TB
     subgraph "Data Collection Layer"
         A[CrawlerOrchestrator] --> B[GameProfileManager]
         B --> C[Game-specific Data Storage]
+        CM[CrawlManager] --> A
+        CM --> B
     end
     
     subgraph "Analysis Layer"
@@ -25,6 +27,8 @@ graph TB
         G --> H[Game Selection Page]
         G --> I[Game Detail Page]
         G --> J[Issue Alert Banner]
+        G --> AM[Admin Management Page]
+        AM --> CM
     end
     
     subgraph "Export Layer"
@@ -39,6 +43,11 @@ graph TB
         E --> E2[Issue Clusterer]
         E --> E3[Priority Calculator]
         E --> E4[Bug Classifier]
+    end
+    
+    subgraph "Crawl Management"
+        CM --> CJ[CrawlJob Queue]
+        CM --> CS[Crawl Status Tracker]
     end
 ```
 
@@ -339,6 +348,237 @@ def api_game_trend(game_id: str):
     pass
 ```
 
+### 8. CrawlManager
+
+대시보드에서 크롤링을 관리하는 컴포넌트.
+
+```python
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Optional, Dict, List
+from enum import Enum
+import threading
+import uuid
+
+class CrawlStatus(Enum):
+    """크롤링 상태"""
+    PENDING = "pending"
+    SEARCHING = "searching"
+    CRAWLING = "crawling"
+    ANALYZING = "analyzing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+@dataclass
+class CrawlJob:
+    """크롤링 작업 정보"""
+    job_id: str
+    game_id: str
+    status: CrawlStatus = CrawlStatus.PENDING
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    total_searched: int = 0
+    total_crawled: int = 0
+    total_failed: int = 0
+    current_step: str = ""
+    progress_percent: float = 0.0
+    error_message: Optional[str] = None
+    
+    def to_dict(self) -> dict:
+        return {
+            "job_id": self.job_id,
+            "game_id": self.game_id,
+            "status": self.status.value,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+            "total_searched": self.total_searched,
+            "total_crawled": self.total_crawled,
+            "total_failed": self.total_failed,
+            "current_step": self.current_step,
+            "progress_percent": self.progress_percent,
+            "error_message": self.error_message,
+            "duration_seconds": self.duration_seconds
+        }
+    
+    @property
+    def duration_seconds(self) -> float:
+        if self.started_at and self.finished_at:
+            return (self.finished_at - self.started_at).total_seconds()
+        elif self.started_at:
+            return (datetime.now() - self.started_at).total_seconds()
+        return 0.0
+
+class CrawlManager:
+    """크롤링 작업 관리자
+    
+    Requirements: 9.1, 9.2, 9.3, 9.4, 9.5
+    - 대시보드에서 크롤링 시작/관리
+    - 백그라운드 크롤링 실행
+    - 진행 상태 추적
+    """
+    
+    def __init__(self, profile_manager: GameProfileManager):
+        self.profile_manager = profile_manager
+        self.jobs: Dict[str, CrawlJob] = {}
+        self.active_jobs: Dict[str, threading.Thread] = {}
+        self._lock = threading.Lock()
+    
+    def start_crawl(self, game_id: str, max_results_per_site: int = 20) -> CrawlJob:
+        """크롤링 시작
+        
+        Requirements: 9.2
+        - 백그라운드에서 크롤링 실행
+        
+        Args:
+            game_id: 게임 ID
+            max_results_per_site: 사이트당 최대 결과 수
+            
+        Returns:
+            CrawlJob: 생성된 크롤링 작업
+        """
+        pass
+    
+    def get_job_status(self, job_id: str) -> Optional[CrawlJob]:
+        """크롤링 작업 상태 조회
+        
+        Requirements: 9.3
+        - 진행 상태 표시
+        """
+        pass
+    
+    def get_game_jobs(self, game_id: str) -> List[CrawlJob]:
+        """게임별 크롤링 작업 목록 조회"""
+        pass
+    
+    def cancel_job(self, job_id: str) -> bool:
+        """크롤링 작업 취소"""
+        pass
+    
+    def _run_crawl(self, job: CrawlJob, profile: GameProfile, max_results: int) -> None:
+        """백그라운드 크롤링 실행 (내부 메서드)"""
+        pass
+    
+    def _update_job_progress(self, job: CrawlJob, status: CrawlStatus, 
+                             step: str, progress: float) -> None:
+        """작업 진행 상태 업데이트"""
+        pass
+
+# Dashboard API 확장 (크롤링 관리)
+
+@app.route('/admin/games')
+def admin_games():
+    """게임 관리 페이지"""
+    pass
+
+@app.route('/admin/games/new')
+def admin_new_game():
+    """새 게임 등록 페이지"""
+    pass
+
+@app.route('/api/admin/games', methods=['POST'])
+def api_create_game():
+    """새 게임 등록 API
+    
+    Requirements: 9.1
+    - 게임명, 키워드, 대상 사이트를 입력받아 GameProfile 생성
+    
+    Request Body:
+        {
+            "game_name": str,
+            "keywords": List[str],
+            "target_sites": List[str]
+        }
+    
+    Returns:
+        JSON: {"game_id": str, "profile": {...}}
+    """
+    pass
+
+@app.route('/api/admin/games/<game_id>', methods=['PUT'])
+def api_update_game(game_id: str):
+    """게임 프로필 수정 API
+    
+    Requirements: 9.7
+    - 키워드, 대상 사이트 변경
+    """
+    pass
+
+@app.route('/api/admin/games/<game_id>', methods=['DELETE'])
+def api_delete_game(game_id: str):
+    """게임 삭제 API
+    
+    Requirements: 9.8
+    - 게임 프로필과 크롤링 데이터 삭제
+    """
+    pass
+
+@app.route('/api/admin/games/<game_id>/crawl', methods=['POST'])
+def api_start_crawl(game_id: str):
+    """크롤링 시작 API
+    
+    Requirements: 9.2
+    - 백그라운드에서 크롤링 실행
+    
+    Request Body:
+        {
+            "max_results_per_site": int (optional, default: 20)
+        }
+    
+    Returns:
+        JSON: {"job_id": str, "status": str}
+    """
+    pass
+
+@app.route('/api/admin/games/<game_id>/crawl/status')
+def api_crawl_status(game_id: str):
+    """크롤링 상태 조회 API
+    
+    Requirements: 9.3
+    - 진행 상태 표시
+    
+    Returns:
+        JSON: {
+            "job_id": str,
+            "status": str,
+            "progress_percent": float,
+            "current_step": str,
+            "total_searched": int,
+            "total_crawled": int,
+            "total_failed": int
+        }
+    """
+    pass
+
+@app.route('/api/admin/games/<game_id>/refresh', methods=['POST'])
+def api_refresh_data(game_id: str):
+    """데이터 갱신 API
+    
+    Requirements: 9.5
+    - 기존 게임의 최신 데이터 재크롤링
+    """
+    pass
+
+@app.route('/api/admin/profiles')
+def api_list_profiles():
+    """등록된 게임 프로필 목록 API
+    
+    Requirements: 9.6
+    - 각 게임의 마지막 크롤링 시간과 데이터 수 표시
+    
+    Returns:
+        JSON: [{
+            "game_id": str,
+            "game_name": str,
+            "keywords": List[str],
+            "target_sites": List[str],
+            "last_crawled_at": str,
+            "post_count": int
+        }, ...]
+    """
+    pass
+```
+
 ## Data Models
 
 ```python
@@ -613,6 +853,30 @@ class GameAnalysisResult:
 *For any* 이슈에 대해 24시간 내 관련 게시글이 10개 이상이면 긴급 알림으로 분류되어야 한다.
 
 **Validates: Requirements 8.4**
+
+### Property 20: GameProfile Creation from Dashboard
+
+*For any* 게임 등록 요청에 대해, 게임명, 키워드, 대상 사이트가 모두 제공되면 GameProfile이 생성되어야 하고, game_id는 자동으로 kebab-case로 생성되어야 한다.
+
+**Validates: Requirements 9.1**
+
+### Property 21: Crawl Job Status Consistency
+
+*For any* 크롤링 작업에 대해, 상태는 PENDING → SEARCHING → CRAWLING → ANALYZING → COMPLETED (또는 FAILED/CANCELLED) 순서로만 전이되어야 한다.
+
+**Validates: Requirements 9.2, 9.3**
+
+### Property 22: Crawl Progress Monotonicity
+
+*For any* 진행 중인 크롤링 작업에 대해, progress_percent는 단조 증가해야 하며 0.0 이상 100.0 이하여야 한다.
+
+**Validates: Requirements 9.3**
+
+### Property 23: Crawl Result Summary Accuracy
+
+*For any* 완료된 크롤링 작업에 대해, total_crawled + total_failed는 total_searched 이하여야 한다.
+
+**Validates: Requirements 9.4**
 
 ## Error Handling
 

@@ -205,94 +205,197 @@
   - 대시보드에서 트렌드 차트가 정상 표시되는지 확인
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 15. 알림 시스템 구현
-  - [ ] 15.1 AlertManager 클래스 구현
+- [x] 15. 알림 시스템 구현
+  - [x] 15.1 AlertManager 클래스 구현
     - Hot Issue 알림 생성
     - 부정적 감성 급증 알림 생성
     - 긴급 알림 분류 (24시간 내 10개 이상)
     - `crawler/analysis/alert_manager.py` 파일 생성
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-  - [ ] 15.2 Property test: 긴급 알림 분류
+  - [x] 15.2 Property test: 긴급 알림 분류
     - **Property 19: Urgent Alert Classification**
     - **Validates: Requirements 8.4**
 
-  - [ ] 15.3 알림 API 및 UI 구현
+  - [x] 15.3 알림 API 및 UI 구현
     - `GET /api/game/<game_id>/alerts` - 알림 목록
     - 부정적 감성 급증 경고 배너
     - _Requirements: 8.2, 8.3_
 
-- [ ] 16. Checkpoint - 알림 시스템 확인
+- [x] 16. Checkpoint - 알림 시스템 확인
   - 대시보드에서 알림이 정상 표시되는지 확인
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 17. 고급 필터 및 정렬 기능 추가
-  - [ ] 17.1 DataFilter 확장
+- [x] 17. 고급 필터 및 정렬 기능 추가
+  - [x] 17.1 DataFilter 확장
     - 감성, 이슈 유형 필터링 추가
     - 감성 점수 정렬 추가
     - _Requirements: 5.4, 5.5_
 
-  - [ ] 17.2 Property test: 게시글 정렬 옵션
+  - [x] 17.2 Property test: 게시글 정렬 옵션
     - **Property 13: Post Sorting Options**
     - **Validates: Requirements 5.4**
 
-  - [ ] 17.3 Property test: 다중 필터 적용
+  - [x] 17.3 Property test: 다중 필터 적용
     - **Property 14: Multi-Filter Application**
     - **Validates: Requirements 5.5**
 
-  - [ ] 17.4 고급 필터 UI 구현
+  - [x] 17.4 고급 필터 UI 구현
     - 감성, 이슈 유형 필터 추가
     - 감성 점수 정렬 옵션 추가
     - `dashboard/templates/game_dashboard.html` 수정
     - _Requirements: 5.4, 5.5_
 
-- [ ] 18. Checkpoint - 고급 필터 기능 확인
+- [x] 18. Checkpoint - 고급 필터 기능 확인
   - 대시보드에서 모든 필터와 정렬이 정상 동작하는지 확인
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 19. QuickSight 내보내기 확장
-  - [ ] 19.1 GameQuickSightExporter 클래스 구현
+- [x] 19. QuickSight 내보내기 확장
+  - [x] 19.1 GameQuickSightExporter 클래스 구현
     - 게임별 디렉토리 구조 생성
     - posts.csv, comments.csv, sentiment.csv, issues.csv 내보내기
     - `crawler/exporters/quicksight_exporter.py` 파일 생성
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-  - [ ] 19.2 Property test: QuickSight 파일 생성
+  - [x] 19.2 Property test: QuickSight 파일 생성
     - **Property 15: QuickSight Export Files**
     - **Validates: Requirements 6.2**
 
-  - [ ] 19.3 Property test: CSV 형식 호환성
+  - [x] 19.3 Property test: CSV 형식 호환성
     - **Property 16: CSV Format Compatibility**
     - **Validates: Requirements 6.3**
 
-- [ ] 20. 분석 데이터 저장소 구현
-  - [ ] 20.1 AnalysisDataStore 클래스 구현
+- [x] 20. 분석 데이터 저장소 구현
+  - [x] 20.1 AnalysisDataStore 클래스 구현
     - 분석 결과 저장 및 로드
     - 게임별 최신 분석 결과 조회
     - `crawler/exporters/analysis_store.py` 파일 생성
     - _Requirements: 1.1, 6.1_
 
-  - [ ] 20.2 Unit test: 분석 데이터 저장/로드
+  - [x] 20.2 Unit test: 분석 데이터 저장/로드
     - 저장 후 로드 시 동일한 데이터 반환 검증
     - _Requirements: 1.1_
 
-- [ ] 21. 통합 및 기존 시스템 연동
-  - [ ] 21.1 GameAnalyzer 통합 클래스 구현
+- [x] 21. 통합 및 기존 시스템 연동
+  - [x] 21.1 GameAnalyzer 통합 클래스 구현
     - SentimentAnalyzer, IssueDetector, TrendAnalyzer 통합
     - 전체 분석 파이프라인 조율
     - `crawler/analysis/game_analyzer.py` 파일 생성
     - _Requirements: 2.1, 3.1, 4.1_
 
-  - [ ] 21.2 기존 CrawlerOrchestrator와 통합
+  - [x] 21.2 기존 CrawlerOrchestrator와 통합
     - 크롤링 후 자동 분석 옵션 추가
     - 게임별 데이터 저장 경로 적용
     - _Requirements: 1.1_
 
-  - [ ] 21.3 Integration test: 전체 분석 흐름
+  - [x] 21.3 Integration test: 전체 분석 흐름
     - 크롤링 → 분석 → 저장 → 대시보드 표시 end-to-end 테스트
     - _Requirements: 1.1, 2.1, 3.1, 4.1, 5.1_
 
-- [ ] 22. Final Checkpoint - 전체 시스템 확인
+- [x] 22. Final Checkpoint - 전체 시스템 확인
+  - 모든 기능이 통합되어 정상 동작하는지 확인
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 23. 대시보드 크롤링 관리 기능 구현
+  - [ ] 23.1 CrawlManager 클래스 구현
+    - `CrawlJob` dataclass 구현 (작업 ID, 상태, 진행률, 결과)
+    - `CrawlStatus` Enum 구현 (PENDING, SEARCHING, CRAWLING, ANALYZING, COMPLETED, FAILED, CANCELLED)
+    - `start_crawl()` 메서드: 백그라운드 크롤링 시작
+    - `get_job_status()` 메서드: 작업 상태 조회
+    - `cancel_job()` 메서드: 작업 취소
+    - `crawler/crawl_manager.py` 파일 생성
+    - _Requirements: 9.2, 9.3, 9.4_
+
+  - [ ] 23.2 Property test: 크롤링 작업 상태 일관성
+    - **Property 21: Crawl Job Status Consistency**
+    - **Validates: Requirements 9.2, 9.3**
+
+  - [ ] 23.3 Property test: 크롤링 진행률 단조성
+    - **Property 22: Crawl Progress Monotonicity**
+    - **Validates: Requirements 9.3**
+
+  - [ ] 23.4 Property test: 크롤링 결과 요약 정확성
+    - **Property 23: Crawl Result Summary Accuracy**
+    - **Validates: Requirements 9.4**
+
+- [ ] 24. 게임 프로필 관리 API 구현
+  - [ ] 24.1 게임 등록 API 구현
+    - `POST /api/admin/games` - 새 게임 등록
+    - 게임명, 키워드, 대상 사이트 입력 받아 GameProfile 생성
+    - game_id 자동 생성 (kebab-case)
+    - _Requirements: 9.1_
+
+  - [ ] 24.2 Property test: 게임 프로필 생성
+    - **Property 20: GameProfile Creation from Dashboard**
+    - **Validates: Requirements 9.1**
+
+  - [ ] 24.3 게임 프로필 수정/삭제 API 구현
+    - `PUT /api/admin/games/<game_id>` - 프로필 수정
+    - `DELETE /api/admin/games/<game_id>` - 게임 삭제
+    - _Requirements: 9.7, 9.8_
+
+  - [ ] 24.4 게임 프로필 목록 API 구현
+    - `GET /api/admin/profiles` - 등록된 게임 목록
+    - 마지막 크롤링 시간, 데이터 수 포함
+    - _Requirements: 9.6_
+
+- [ ] 25. 크롤링 실행 API 구현
+  - [ ] 25.1 크롤링 시작 API 구현
+    - `POST /api/admin/games/<game_id>/crawl` - 크롤링 시작
+    - 백그라운드 실행, job_id 반환
+    - _Requirements: 9.2_
+
+  - [ ] 25.2 크롤링 상태 조회 API 구현
+    - `GET /api/admin/games/<game_id>/crawl/status` - 상태 조회
+    - 진행률, 현재 단계, 수집 결과 반환
+    - _Requirements: 9.3, 9.4_
+
+  - [ ] 25.3 데이터 갱신 API 구현
+    - `POST /api/admin/games/<game_id>/refresh` - 재크롤링
+    - 기존 데이터 유지하며 최신 데이터 추가
+    - _Requirements: 9.5_
+
+- [ ] 26. 게임 관리 대시보드 UI 구현
+  - [ ] 26.1 게임 관리 페이지 구현
+    - `/admin/games` - 등록된 게임 목록
+    - 각 게임의 상태, 마지막 크롤링 시간, 데이터 수 표시
+    - `dashboard/templates/admin_games.html` 생성
+    - _Requirements: 9.6_
+
+  - [ ] 26.2 새 게임 등록 페이지 구현
+    - `/admin/games/new` - 게임 등록 폼
+    - 게임명, 키워드, 대상 사이트 입력 UI
+    - `dashboard/templates/admin_new_game.html` 생성
+    - _Requirements: 9.1_
+
+  - [ ] 26.3 크롤링 제어 UI 구현
+    - 크롤링 시작/중지 버튼
+    - 실시간 진행 상태 표시 (WebSocket 또는 polling)
+    - 결과 요약 표시
+    - _Requirements: 9.2, 9.3, 9.4_
+
+  - [ ] 26.4 데이터 갱신 UI 구현
+    - 데이터 갱신 버튼
+    - 갱신 진행 상태 표시
+    - _Requirements: 9.5_
+
+- [ ] 27. Checkpoint - 크롤링 관리 기능 확인
+  - 대시보드에서 새 게임 등록이 정상 동작하는지 확인
+  - 크롤링 시작/상태 조회가 정상 동작하는지 확인
+  - 데이터 갱신이 정상 동작하는지 확인
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 28. Final Integration - 크롤링 관리 통합
+  - [ ] 28.1 메인 대시보드에 관리 링크 추가
+    - 헤더에 "게임 관리" 메뉴 추가
+    - 게임 카드에 "크롤링" 버튼 추가
+    - _Requirements: 9.2_
+
+  - [ ] 28.2 Integration test: 크롤링 관리 전체 흐름
+    - 게임 등록 → 크롤링 시작 → 상태 확인 → 완료 → 대시보드 표시 end-to-end 테스트
+    - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+
+- [ ] 29. Final Checkpoint - 크롤링 관리 포함 전체 시스템 확인
   - 모든 기능이 통합되어 정상 동작하는지 확인
   - Ensure all tests pass, ask the user if questions arise.
 
@@ -304,3 +407,7 @@
 - 기존 `crawler/` 모듈 구조를 확장하여 `crawler/analysis/` 디렉토리 추가
 - 한국어 감성 분석은 사전 기반 방식으로 시작하고, 추후 ML 모델로 확장 가능
 - QuickSight 연동은 게임별 별도 경로로 CSV 파일 생성하여 기존 연동 방식 유지
+- **크롤링 관리 기능** (Task 23-29): 대시보드에서 직접 게임 등록 및 크롤링 실행 가능
+  - 기존 `CrawlerOrchestrator`를 활용하여 백그라운드 크롤링 실행
+  - 크롤링 진행 상태를 실시간으로 추적하고 표시
+  - 게임 프로필 CRUD 및 데이터 갱신 기능 제공

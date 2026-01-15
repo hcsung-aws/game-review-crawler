@@ -65,6 +65,60 @@
         </div>
     </div>
 
+    <!-- 긴급 알림 배너 (Requirements 8.4) -->
+    <div id="urgent-alert-banner" class="hidden">
+        <div class="bg-gradient-to-r from-purple-700 to-pink-600 text-white py-3 shadow-lg">
+            <div class="container mx-auto px-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-3 animate-bounce">🚨</span>
+                        <div>
+                            <p id="urgent-alert-message" class="font-semibold">긴급 알림!</p>
+                            <p id="urgent-alert-detail" class="text-sm text-purple-100 mt-0.5"></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="scrollToAlerts()" class="px-4 py-1.5 bg-white text-purple-600 text-sm font-medium rounded-md hover:bg-purple-50 transition-colors">
+                            알림 확인
+                        </button>
+                        <button onclick="dismissUrgentAlertBanner()" class="text-white hover:text-purple-200 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 부정적 감성 급증 경고 배너 (Requirements 8.2) -->
+    <div id="sentiment-spike-banner" class="hidden">
+        <div class="bg-gradient-to-r from-yellow-600 to-amber-600 text-white py-3 shadow-lg">
+            <div class="container mx-auto px-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-3">⚠️</span>
+                        <div>
+                            <p id="sentiment-spike-message" class="font-semibold">부정적 감성 급증 감지!</p>
+                            <p id="sentiment-spike-detail" class="text-sm text-yellow-100 mt-0.5"></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="scrollToTrend()" class="px-4 py-1.5 bg-white text-yellow-600 text-sm font-medium rounded-md hover:bg-yellow-50 transition-colors">
+                            트렌드 확인
+                        </button>
+                        <button onclick="dismissSentimentSpikeBanner()" class="text-white hover:text-yellow-200 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <main class="container mx-auto px-4 py-8">
         <!-- 통계 카드 -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -319,6 +373,71 @@
             </div>
         </div>
 
+        <!-- 알림 섹션 (Requirements 8.1, 8.2, 8.3, 8.4) -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8" id="alerts-section">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-bold text-gray-800">🔔 알림</h2>
+                <button onclick="loadAlertsData()" class="px-4 py-2 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    새로고침
+                </button>
+            </div>
+            
+            <div id="alerts-loading" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                <p class="text-gray-500 mt-2">알림 로드 중...</p>
+            </div>
+            
+            <div id="alerts-content" class="hidden">
+                <!-- 알림 통계 요약 -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <!-- 총 알림 수 -->
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-purple-600 font-medium">🔔 총 알림</p>
+                        <p id="alerts-total" class="text-3xl font-bold text-purple-700 mt-1">-</p>
+                    </div>
+                    
+                    <!-- 긴급 알림 수 -->
+                    <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-red-600 font-medium">🚨 긴급</p>
+                        <p id="alerts-urgent" class="text-3xl font-bold text-red-700 mt-1">-</p>
+                    </div>
+                    
+                    <!-- Hot Issue 알림 수 -->
+                    <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-orange-600 font-medium">🔥 Hot Issue</p>
+                        <p id="alerts-hot-issue" class="text-3xl font-bold text-orange-700 mt-1">-</p>
+                    </div>
+                    
+                    <!-- 감성 급증 알림 수 -->
+                    <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-4 text-center">
+                        <p class="text-sm text-yellow-600 font-medium">⚠️ 감성 급증</p>
+                        <p id="alerts-sentiment-spike" class="text-3xl font-bold text-yellow-700 mt-1">-</p>
+                    </div>
+                </div>
+                
+                <!-- 알림 목록 -->
+                <div class="border-t pt-6">
+                    <h3 class="text-sm font-medium text-gray-700 mb-3">📋 알림 목록 (우선순위 순)</h3>
+                    <div id="alerts-list-container">
+                        <div id="alerts-empty" class="text-center py-8 text-gray-500 hidden">
+                            현재 알림이 없습니다.
+                        </div>
+                        <div id="alerts-list" class="space-y-3">
+                            <!-- 동적으로 채워짐 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="alerts-error" class="hidden text-center py-8">
+                <svg class="w-12 h-12 text-red-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-red-500">알림 데이터를 불러오는데 실패했습니다.</p>
+                <button onclick="loadAlertsData()" class="mt-2 text-blue-600 hover:underline">다시 시도</button>
+            </div>
+        </div>
+
         <!-- Hot Post 섹션 (게시글 기반 이슈 탐지) -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-8" id="issues-section">
             <div class="flex items-center justify-between mb-6">
@@ -402,6 +521,7 @@
                             <option value="created_at" {% if filters.sort_by == 'created_at' %}selected{% endif %}>작성일</option>
                             <option value="view_count" {% if filters.sort_by == 'view_count' %}selected{% endif %}>조회수</option>
                             <option value="comment_count" {% if filters.sort_by == 'comment_count' %}selected{% endif %}>댓글수</option>
+                            <option value="sentiment_score" {% if filters.sort_by == 'sentiment_score' %}selected{% endif %}>감성 점수</option>
                         </select>
                     </div>
                     <div>
@@ -425,6 +545,51 @@
                             <span class="ml-2 text-sm text-gray-700">{{ site }}</span>
                         </label>
                         {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- 고급 필터 (Requirements 5.3, 5.4, 5.5) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
+                    <!-- 감성 필터 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">😊 감성 필터</label>
+                        <select name="sentiment" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="" {% if not filters.sentiment %}selected{% endif %}>전체</option>
+                            <option value="positive" {% if filters.sentiment == 'positive' %}selected{% endif %}>😊 긍정</option>
+                            <option value="neutral" {% if filters.sentiment == 'neutral' %}selected{% endif %}>😐 중립</option>
+                            <option value="negative" {% if filters.sentiment == 'negative' %}selected{% endif %}>😠 부정</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 이슈 유형 필터 (복수 선택 가능) -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">🏷️ 이슈 유형</label>
+                        <div class="flex flex-wrap gap-2">
+                            {% for issue_type in available_issue_types %}
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" name="issue_type" value="{{ issue_type }}"
+                                       {% if issue_type in filters.issue_types %}checked{% endif %}
+                                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span class="ml-1 text-xs text-gray-700">{{ issue_type }}</span>
+                            </label>
+                            {% endfor %}
+                            {% if not available_issue_types %}
+                            <span class="text-xs text-gray-500">이슈 데이터 없음</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- 감성 점수 범위 필터 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">📊 감성 점수 범위</label>
+                        <div class="flex gap-2">
+                            <input type="number" name="sentiment_min" value="{{ filters.sentiment_min if filters.sentiment_min is not none else '' }}" 
+                                   placeholder="최소 (-1.0)" step="0.1" min="-1" max="1"
+                                   class="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                            <input type="number" name="sentiment_max" value="{{ filters.sentiment_max if filters.sentiment_max is not none else '' }}" 
+                                   placeholder="최대 (1.0)" step="0.1" min="-1" max="1"
+                                   class="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        </div>
                     </div>
                 </div>
                 
@@ -457,6 +622,7 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작성일</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">조회수</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">댓글</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">감성</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
@@ -485,6 +651,21 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {{ post.comments|length if post.comments else 0 }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% set sentiment = post.get('analysis', {}).get('sentiment', {}) %}
+                                {% set label = sentiment.get('label', 'neutral') %}
+                                {% set score = sentiment.get('score', 0) %}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                    {% if label == 'positive' %}bg-green-100 text-green-800
+                                    {% elif label == 'negative' %}bg-red-100 text-red-800
+                                    {% else %}bg-gray-100 text-gray-800{% endif %}"
+                                    title="점수: {{ '%.2f'|format(score) }}">
+                                    {% if label == 'positive' %}😊
+                                    {% elif label == 'negative' %}😠
+                                    {% else %}😐{% endif %}
+                                    {{ '%.1f'|format(score) }}
+                                </span>
                             </td>
                         </tr>
                         {% endfor %}
@@ -991,11 +1172,212 @@
             }
         }
         
+        // 알림 섹션으로 스크롤
+        function scrollToAlerts() {
+            const alertsSection = document.getElementById('alerts-section');
+            if (alertsSection) {
+                alertsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+        
+        // 트렌드 섹션으로 스크롤
+        function scrollToTrend() {
+            const trendSection = document.getElementById('trend-section');
+            if (trendSection) {
+                trendSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+        
+        // 긴급 알림 배너 닫기
+        function dismissUrgentAlertBanner() {
+            const bannerEl = document.getElementById('urgent-alert-banner');
+            bannerEl.classList.add('hidden');
+            const dismissedKey = `urgent_alert_dismissed_${gameId}`;
+            sessionStorage.setItem(dismissedKey, 'true');
+        }
+        
+        // 감성 급증 배너 닫기
+        function dismissSentimentSpikeBanner() {
+            const bannerEl = document.getElementById('sentiment-spike-banner');
+            bannerEl.classList.add('hidden');
+            const dismissedKey = `sentiment_spike_dismissed_${gameId}`;
+            sessionStorage.setItem(dismissedKey, 'true');
+        }
+        
+        // 알림 데이터 로드 (Requirements 8.1, 8.2, 8.3, 8.4)
+        async function loadAlertsData() {
+            const loadingEl = document.getElementById('alerts-loading');
+            const contentEl = document.getElementById('alerts-content');
+            const errorEl = document.getElementById('alerts-error');
+            
+            // 로딩 상태 표시
+            loadingEl.classList.remove('hidden');
+            contentEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+            
+            try {
+                // 필터 조건 적용
+                const filters = getCurrentFilters();
+                let url = `/api/game/${gameId}/alerts`;
+                const params = new URLSearchParams();
+                
+                if (filters.start_date) params.append('start_date', filters.start_date);
+                if (filters.end_date) params.append('end_date', filters.end_date);
+                if (filters.sites) {
+                    filters.sites.forEach(site => params.append('site', site));
+                }
+                
+                if (params.toString()) {
+                    url += '?' + params.toString();
+                }
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('API 요청 실패');
+                
+                const data = await response.json();
+                
+                // 데이터 표시
+                displayAlertsData(data);
+                
+                // 배너 표시
+                displayAlertBanners(data);
+                
+                // 로딩 완료
+                loadingEl.classList.add('hidden');
+                contentEl.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('알림 데이터 로드 실패:', error);
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+            }
+        }
+        
+        // 알림 데이터 표시
+        function displayAlertsData(data) {
+            const summary = data.summary;
+            
+            // 통계 요약 표시
+            document.getElementById('alerts-total').textContent = summary.total_alerts;
+            document.getElementById('alerts-urgent').textContent = summary.urgent_count;
+            document.getElementById('alerts-hot-issue').textContent = summary.hot_issue_count;
+            document.getElementById('alerts-sentiment-spike').textContent = summary.sentiment_spike_count;
+            
+            // 알림 목록 표시
+            const listEl = document.getElementById('alerts-list');
+            const emptyEl = document.getElementById('alerts-empty');
+            
+            if (!data.alerts || data.alerts.length === 0) {
+                listEl.innerHTML = '';
+                emptyEl.classList.remove('hidden');
+                return;
+            }
+            
+            emptyEl.classList.add('hidden');
+            
+            // 알림 카드 생성
+            listEl.innerHTML = data.alerts.map(alert => {
+                const priorityColor = getAlertPriorityColor(alert.priority);
+                const typeIcon = getAlertTypeIcon(alert.alert_type);
+                const createdAt = alert.created_at ? alert.created_at.substring(0, 16).replace('T', ' ') : '-';
+                
+                // 관련 게시글 링크
+                let relatedPostsHtml = '';
+                if (alert.related_posts && alert.related_posts.length > 0) {
+                    relatedPostsHtml = `
+                        <div class="mt-2 flex flex-wrap gap-1">
+                            ${alert.related_posts.slice(0, 3).map(url => `
+                                <a href="/post/${encodeURIComponent(url)}" 
+                                   class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors truncate max-w-xs"
+                                   title="${escapeHtml(url)}">
+                                    📄 관련 게시글
+                                </a>
+                            `).join('')}
+                            ${alert.related_posts.length > 3 ? `<span class="text-xs text-gray-400">+${alert.related_posts.length - 3}개</span>` : ''}
+                        </div>
+                    `;
+                }
+                
+                return `
+                    <div class="border rounded-lg p-4 ${alert.is_urgent ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'} hover:shadow-md transition-shadow">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start">
+                                <span class="text-2xl mr-3">${typeIcon}</span>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">${escapeHtml(alert.title)}</h4>
+                                    <p class="text-sm text-gray-600 mt-1">${escapeHtml(alert.message)}</p>
+                                    ${relatedPostsHtml}
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-end">
+                                <span class="px-2 py-1 text-xs font-medium rounded ${priorityColor}">
+                                    ${alert.priority.toUpperCase()}
+                                </span>
+                                <span class="text-xs text-gray-400 mt-1">${createdAt}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // 알림 배너 표시
+        function displayAlertBanners(data) {
+            // 긴급 알림 배너
+            const urgentBannerEl = document.getElementById('urgent-alert-banner');
+            const urgentDismissedKey = `urgent_alert_dismissed_${gameId}`;
+            
+            if (data.summary.urgent_count > 0 && !sessionStorage.getItem(urgentDismissedKey)) {
+                const urgentAlert = data.alerts.find(a => a.is_urgent);
+                if (urgentAlert) {
+                    document.getElementById('urgent-alert-message').textContent = urgentAlert.title;
+                    document.getElementById('urgent-alert-detail').textContent = urgentAlert.message;
+                    urgentBannerEl.classList.remove('hidden');
+                }
+            }
+            
+            // 감성 급증 배너
+            const spikeBannerEl = document.getElementById('sentiment-spike-banner');
+            const spikeDismissedKey = `sentiment_spike_dismissed_${gameId}`;
+            
+            if (data.summary.sentiment_spike_count > 0 && !sessionStorage.getItem(spikeDismissedKey)) {
+                const spikeAlert = data.alerts.find(a => a.alert_type === 'sentiment_spike');
+                if (spikeAlert) {
+                    document.getElementById('sentiment-spike-message').textContent = spikeAlert.title;
+                    document.getElementById('sentiment-spike-detail').textContent = spikeAlert.message;
+                    spikeBannerEl.classList.remove('hidden');
+                }
+            }
+        }
+        
+        // 알림 우선순위 색상 반환
+        function getAlertPriorityColor(priority) {
+            switch (priority) {
+                case 'critical': return 'bg-red-200 text-red-900';
+                case 'high': return 'bg-orange-200 text-orange-900';
+                case 'medium': return 'bg-yellow-200 text-yellow-900';
+                case 'low': return 'bg-green-200 text-green-900';
+                default: return 'bg-gray-200 text-gray-900';
+            }
+        }
+        
+        // 알림 유형 아이콘 반환
+        function getAlertTypeIcon(alertType) {
+            switch (alertType) {
+                case 'hot_issue': return '🔥';
+                case 'sentiment_spike': return '⚠️';
+                case 'urgent': return '🚨';
+                case 'bug_critical': return '🐛';
+                default: return '🔔';
+            }
+        }
+        
         // 페이지 로드 시 데이터 로드
         document.addEventListener('DOMContentLoaded', function() {
             loadSentimentData();
             loadTrendData();
             loadHotPostsData();
+            loadAlertsData();
         });
         
         // 트렌드 차트 인스턴스

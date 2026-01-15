@@ -5,9 +5,12 @@ Requirements: 1.1, 1.2, 2.1, 3.1, 4.1, 5.1, 6.1
 - 전체 크롤링 프로세스 조율
 - SearchEngineManager, ContentCrawler, DataStore 통합
 - 검색 → 크롤링 → 저장 워크플로우 관리
+- 게임별 데이터 저장 경로 지원
+- 크롤링 후 자동 분석 옵션 지원
 """
 
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional, Dict, Any
@@ -17,6 +20,7 @@ from crawler.models.data_models import (
     SearchResult, 
     PostContent
 )
+from crawler.models.game_profile import GameProfile, GameProfileManager
 from crawler.search.manager import SearchEngineManager
 from crawler.search.adapters import DuckDuckGoAdapter, GoogleCSEAdapter, DirectCrawlAdapter
 from crawler.content_crawler import ContentCrawler
@@ -43,6 +47,8 @@ class CrawlResult:
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     errors: List[str] = field(default_factory=list)
+    game_id: Optional[str] = None  # 게임 ID (게임별 크롤링 시)
+    analysis_result: Optional[Any] = None  # 분석 결과 (자동 분석 시)
     
     @property
     def duration_seconds(self) -> float:
@@ -60,7 +66,7 @@ class CrawlResult:
     
     def to_dict(self) -> Dict[str, Any]:
         """딕셔너리로 변환"""
-        return {
+        result = {
             "total_searched": self.total_searched,
             "total_crawled": self.total_crawled,
             "total_failed": self.total_failed,
@@ -71,8 +77,12 @@ class CrawlResult:
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,
             "duration_seconds": self.duration_seconds,
             "errors": self.errors,
-            "posts_count": len(self.posts)
+            "posts_count": len(self.posts),
+            "game_id": self.game_id
         }
+        if self.analysis_result:
+            result["analysis_performed"] = True
+        return result
 
 
 class CrawlerOrchestrator:
@@ -81,7 +91,7 @@ class CrawlerOrchestrator:
     전체 크롤링 워크플로우를 관리하고 조율한다.
     
     Requirements:
-    - 1.1: 검색 결과 URL에 접속하여 Post_Content 추출
+    - 1.1: 검색 결과 URL에 접속하여 Post_Content 추출, 게임별 데이터 저장 경로 지원
     - 1.2: 제목, 본문, 작성일, 조회수, 추천수 구조화
     - 2.1: 게시글 파싱 시 Comment_Data 함께 추출
     - 3.1: 검색 결과에 대해 Relevance_Score 계산
@@ -90,18 +100,29 @@ class CrawlerOrchestrator:
     - 6.1: 게시글과 댓글을 관계형 구조로 저장
     """
     
-    def __init__(self, config: Optional[CrawlerConfig] = None):
+    def __init__(
+        self, 
+        config: Optional[CrawlerConfig] = None,
+        profile_manager: Optional[GameProfileManager] = None
+    ):
         """CrawlerOrchestrator 초기화
         
         Args:
             config: 크롤러 설정. None이면 기본값 사용
+            profile_manager: 게임 프로필 관리자. None이면 새로 생성
         """
         self.config = config or CrawlerConfig()
+        
+        # 게임 프로필 관리자
+        self.profile_manager = profile_manager or GameProfileManager()
         
         # 컴포넌트 초기화
         self.search_engine = SearchEngineManager(self.config)
         self.content_crawler = ContentCrawler(self.config)
         self.data_store = DataStore(self.config)
+        
+        # GameAnalyzer는 필요 시 lazy 초기화
+        self._game_analyzer = None
         
         # 기본 검색 어댑터 등록
         self._register_default_adapters()
@@ -131,13 +152,28 @@ class CrawlerOrchestrator:
         )
         self.search_engine.register_adapter(direct_adapter)
     
+    def _get_game_analyzer(self):
+        """GameAnalyzer 인스턴스 반환 (lazy 초기화)
+        
+        Returns:
+            GameAnalyzer 인스턴스
+        """
+        if self._game_analyzer is None:
+            from crawler.analysis.game_analyzer import GameAnalyzer
+            self._game_analyzer = GameAnalyzer(
+                profile_manager=self.profile_manager
+            )
+        return self._game_analyzer
+    
     def crawl(
         self, 
         keywords: List[str], 
         sites: List[str],
         max_results_per_site: int = 10,
         save_results: bool = True,
-        output_format: str = "json"
+        output_format: str = "json",
+        game_id: Optional[str] = None,
+        auto_analyze: bool = False
     ) -> CrawlResult:
         """크롤링 수행
         
@@ -151,6 +187,8 @@ class CrawlerOrchestrator:
             max_results_per_site: 사이트당 최대 검색 결과 수
             save_results: 결과 저장 여부
             output_format: 출력 형식 ("json" 또는 "csv")
+            game_id: 게임 ID (게임별 저장 경로 사용 시)
+            auto_analyze: 크롤링 후 자동 분석 수행 여부
             
         Returns:
             CrawlResult: 크롤링 결과
@@ -158,10 +196,11 @@ class CrawlerOrchestrator:
         result = CrawlResult(
             keywords_used=keywords.copy(),
             sites_crawled=sites.copy(),
-            started_at=datetime.now()
+            started_at=datetime.now(),
+            game_id=game_id
         )
         
-        logger.info(f"크롤링 시작: keywords={keywords}, sites={sites}")
+        logger.info(f"크롤링 시작: keywords={keywords}, sites={sites}, game_id={game_id}")
         
         try:
             # 1. 검색 수행
@@ -201,9 +240,21 @@ class CrawlerOrchestrator:
                     result.errors.append(error_msg)
                     logger.error(error_msg)
             
-            # 4. 결과 저장
+            # 4. 결과 저장 (게임별 경로 지원)
             if save_results and result.posts:
-                self._save_results(result.posts, output_format)
+                self._save_results(result.posts, output_format, game_id)
+            
+            # 5. 자동 분석 수행
+            if auto_analyze and result.posts and game_id:
+                logger.info(f"자동 분석 수행 중: game_id={game_id}")
+                analyzer = self._get_game_analyzer()
+                analysis_result = analyzer.analyze(
+                    game_id=game_id,
+                    posts=result.posts,
+                    save_result=True
+                )
+                result.analysis_result = analysis_result
+                logger.info(f"자동 분석 완료: 이슈 {len(analysis_result.issues)}개 탐지")
             
         except Exception as e:
             error_msg = f"크롤링 프로세스 에러: {str(e)}"
@@ -255,20 +306,34 @@ class CrawlerOrchestrator:
     def _save_results(
         self, 
         posts: List[PostContent], 
-        output_format: str
+        output_format: str,
+        game_id: Optional[str] = None
     ) -> str:
         """결과 저장
+        
+        Requirements: 1.1
+        - 게임별로 별도의 데이터 디렉토리에 결과를 저장
         
         Args:
             posts: 저장할 게시글 목록
             output_format: 출력 형식
+            game_id: 게임 ID (게임별 저장 경로 사용 시)
             
         Returns:
             저장된 파일 경로
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"crawl_results_{timestamp}"
-        filepath = f"{self.config.output_dir}/{filename}"
+        
+        # 게임별 저장 경로 결정
+        if game_id:
+            output_dir = self.profile_manager.get_data_path(game_id)
+            # 디렉토리 생성
+            os.makedirs(output_dir, exist_ok=True)
+        else:
+            output_dir = self.config.output_dir
+        
+        filepath = f"{output_dir}/{filename}"
         
         exporter = ExporterFactory.create(output_format)
         saved_path = exporter.export(posts, filepath)
@@ -414,6 +479,150 @@ class CrawlerOrchestrator:
         
         logger.info(f"내보내기 완료: {saved_path}")
         return saved_path
+    
+    def crawl_game(
+        self,
+        profile: GameProfile,
+        max_results_per_site: int = 10,
+        save_results: bool = True,
+        output_format: str = "json",
+        auto_analyze: bool = True
+    ) -> CrawlResult:
+        """게임 프로필 기반 크롤링
+        
+        Requirements: 1.1
+        - 게임 프로필의 키워드와 대상 사이트를 사용하여 크롤링
+        - 게임별 데이터 저장 경로 적용
+        
+        Args:
+            profile: 게임 프로필
+            max_results_per_site: 사이트당 최대 검색 결과 수
+            save_results: 결과 저장 여부
+            output_format: 출력 형식
+            auto_analyze: 크롤링 후 자동 분석 수행 여부
+            
+        Returns:
+            CrawlResult: 크롤링 결과
+        """
+        # 프로필 등록 (아직 등록되지 않은 경우)
+        if not self.profile_manager.get_profile(profile.game_id):
+            self.profile_manager.register_game(profile)
+        
+        # 디렉토리 생성
+        self.profile_manager.ensure_directories(profile.game_id)
+        
+        logger.info(f"게임 '{profile.game_name}' 크롤링 시작")
+        
+        return self.crawl(
+            keywords=profile.keywords,
+            sites=profile.target_sites,
+            max_results_per_site=max_results_per_site,
+            save_results=save_results,
+            output_format=output_format,
+            game_id=profile.game_id,
+            auto_analyze=auto_analyze
+        )
+    
+    def crawl_game_by_id(
+        self,
+        game_id: str,
+        max_results_per_site: int = 10,
+        save_results: bool = True,
+        output_format: str = "json",
+        auto_analyze: bool = True
+    ) -> Optional[CrawlResult]:
+        """게임 ID로 크롤링
+        
+        Requirements: 1.1
+        - 등록된 게임 프로필을 사용하여 크롤링
+        
+        Args:
+            game_id: 게임 ID
+            max_results_per_site: 사이트당 최대 검색 결과 수
+            save_results: 결과 저장 여부
+            output_format: 출력 형식
+            auto_analyze: 크롤링 후 자동 분석 수행 여부
+            
+        Returns:
+            CrawlResult: 크롤링 결과 또는 None (프로필이 없는 경우)
+        """
+        profile = self.profile_manager.get_profile(game_id)
+        
+        if not profile:
+            logger.error(f"게임 프로필을 찾을 수 없습니다: {game_id}")
+            return None
+        
+        return self.crawl_game(
+            profile=profile,
+            max_results_per_site=max_results_per_site,
+            save_results=save_results,
+            output_format=output_format,
+            auto_analyze=auto_analyze
+        )
+    
+    def register_game(self, profile: GameProfile) -> None:
+        """게임 프로필 등록
+        
+        Args:
+            profile: 등록할 게임 프로필
+        """
+        self.profile_manager.register_game(profile)
+        self.profile_manager.ensure_directories(profile.game_id)
+        logger.info(f"게임 프로필 등록 완료: {profile.game_name} ({profile.game_id})")
+    
+    def get_game_profile(self, game_id: str) -> Optional[GameProfile]:
+        """게임 프로필 조회
+        
+        Args:
+            game_id: 게임 ID
+            
+        Returns:
+            게임 프로필 또는 None
+        """
+        return self.profile_manager.get_profile(game_id)
+    
+    def list_games(self) -> List[GameProfile]:
+        """등록된 게임 목록 조회
+        
+        Returns:
+            게임 프로필 목록
+        """
+        return self.profile_manager.list_games()
+    
+    def get_game_analyzer(self):
+        """GameAnalyzer 인스턴스 반환
+        
+        Returns:
+            GameAnalyzer 인스턴스
+        """
+        return self._get_game_analyzer()
+    
+    def analyze_game(
+        self,
+        game_id: str,
+        posts: Optional[List[PostContent]] = None
+    ) -> Optional[Any]:
+        """게임 데이터 분석
+        
+        Requirements: 2.1, 3.1, 4.1
+        - 게임 데이터에 대해 감성 분석, 이슈 탐지, 트렌드 분석 수행
+        
+        Args:
+            game_id: 게임 ID
+            posts: 분석할 게시글 목록 (None이면 저장된 데이터 사용)
+            
+        Returns:
+            GameAnalysisResult 또는 None
+        """
+        if posts is None:
+            posts = self.data_store.get_posts()
+        
+        if not posts:
+            logger.warning(f"분석할 데이터가 없습니다: {game_id}")
+            return None
+        
+        analyzer = self._get_game_analyzer()
+        return analyzer.analyze(game_id=game_id, posts=posts, save_result=True)
     
     def close(self) -> None:
         """리소스 정리"""

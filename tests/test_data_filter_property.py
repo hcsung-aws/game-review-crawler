@@ -16,7 +16,10 @@ import uuid
 
 from crawler.models.data_models import PostContent, Comment
 from crawler.models.analysis_models import SentimentResult, SentimentLabel
-from crawler.utils.data_filter import DataFilter, FilterCriteria, SortField, SortOrder
+from crawler.utils.data_filter import (
+    DataFilter, FilterCriteria, SortField, SortOrder, 
+    SentimentFilter, IssueTypeFilter
+)
 
 
 # Strategies for generating test data
@@ -355,3 +358,329 @@ class TestNegativePostFiltering:
         for i in range(len(sorted_asc) - 1):
             assert sorted_asc[i][1].score <= sorted_asc[i + 1][1].score, \
                 "Posts should be sorted by sentiment score in ascending order"
+
+
+class TestSentimentFiltering:
+    """감성 필터링 테스트
+    
+    **Feature: game-analytics-dashboard, Property 14: Multi-Filter Application**
+    **Validates: Requirements 5.5**
+    """
+    
+    @settings(max_examples=100)
+    @given(
+        scores=st.lists(
+            st.floats(min_value=-1.0, max_value=1.0, allow_nan=False, allow_infinity=False),
+            min_size=1,
+            max_size=20
+        )
+    )
+    def test_sentiment_filter_positive_returns_only_positive(self, scores):
+        """긍정 필터는 긍정 레이블의 게시글만 반환해야 한다."""
+        data_filter = DataFilter()
+        
+        # 테스트 데이터 생성
+        posts_with_sentiment = []
+        for i, score in enumerate(scores):
+            post = PostContent(
+                url=f"https://example.com/{i}",
+                title=f"Test Post {i}",
+                body="Test body",
+                site="ruliweb",
+                keyword="test"
+            )
+            
+            # 레이블 결정
+            if score > 0.3:
+                label = SentimentLabel.POSITIVE
+            elif score < -0.3:
+                label = SentimentLabel.NEGATIVE
+            else:
+                label = SentimentLabel.NEUTRAL
+            
+            sentiment = SentimentResult(score=score, label=label)
+            posts_with_sentiment.append((post, sentiment))
+        
+        # 긍정 필터 적용
+        filtered = data_filter.filter_by_sentiment(
+            posts_with_sentiment, 
+            sentiment_filter=SentimentFilter.POSITIVE
+        )
+        
+        # 모든 필터링된 게시글은 긍정 레이블이어야 함
+        for post, sentiment in filtered:
+            assert sentiment.label == SentimentLabel.POSITIVE, \
+                f"Sentiment label {sentiment.label} should be POSITIVE"
+    
+    @settings(max_examples=100)
+    @given(
+        scores=st.lists(
+            st.floats(min_value=-1.0, max_value=1.0, allow_nan=False, allow_infinity=False),
+            min_size=1,
+            max_size=20
+        )
+    )
+    def test_sentiment_filter_negative_returns_only_negative(self, scores):
+        """부정 필터는 부정 레이블의 게시글만 반환해야 한다."""
+        data_filter = DataFilter()
+        
+        # 테스트 데이터 생성
+        posts_with_sentiment = []
+        for i, score in enumerate(scores):
+            post = PostContent(
+                url=f"https://example.com/{i}",
+                title=f"Test Post {i}",
+                body="Test body",
+                site="ruliweb",
+                keyword="test"
+            )
+            
+            if score > 0.3:
+                label = SentimentLabel.POSITIVE
+            elif score < -0.3:
+                label = SentimentLabel.NEGATIVE
+            else:
+                label = SentimentLabel.NEUTRAL
+            
+            sentiment = SentimentResult(score=score, label=label)
+            posts_with_sentiment.append((post, sentiment))
+        
+        # 부정 필터 적용
+        filtered = data_filter.filter_by_sentiment(
+            posts_with_sentiment, 
+            sentiment_filter=SentimentFilter.NEGATIVE
+        )
+        
+        # 모든 필터링된 게시글은 부정 레이블이어야 함
+        for post, sentiment in filtered:
+            assert sentiment.label == SentimentLabel.NEGATIVE, \
+                f"Sentiment label {sentiment.label} should be NEGATIVE"
+    
+    @settings(max_examples=100)
+    @given(
+        scores=st.lists(
+            st.floats(min_value=-1.0, max_value=1.0, allow_nan=False, allow_infinity=False),
+            min_size=1,
+            max_size=20
+        ),
+        min_score=st.floats(min_value=-1.0, max_value=0.5, allow_nan=False, allow_infinity=False),
+        max_score=st.floats(min_value=-0.5, max_value=1.0, allow_nan=False, allow_infinity=False)
+    )
+    def test_sentiment_filter_by_score_range(self, scores, min_score, max_score):
+        """점수 범위 필터는 해당 범위 내의 게시글만 반환해야 한다."""
+        # min_score가 max_score보다 크면 스왑
+        if min_score > max_score:
+            min_score, max_score = max_score, min_score
+        
+        data_filter = DataFilter()
+        
+        # 테스트 데이터 생성
+        posts_with_sentiment = []
+        for i, score in enumerate(scores):
+            post = PostContent(
+                url=f"https://example.com/{i}",
+                title=f"Test Post {i}",
+                body="Test body",
+                site="ruliweb",
+                keyword="test"
+            )
+            sentiment = SentimentResult(score=score, label=SentimentLabel.NEUTRAL)
+            posts_with_sentiment.append((post, sentiment))
+        
+        # 점수 범위 필터 적용
+        filtered = data_filter.filter_by_sentiment(
+            posts_with_sentiment,
+            min_score=min_score,
+            max_score=max_score
+        )
+        
+        # 모든 필터링된 게시글은 점수 범위 내에 있어야 함
+        for post, sentiment in filtered:
+            assert min_score <= sentiment.score <= max_score, \
+                f"Sentiment score {sentiment.score} should be in range [{min_score}, {max_score}]"
+
+
+class TestIssueTypeFiltering:
+    """이슈 유형 필터링 테스트
+    
+    **Feature: game-analytics-dashboard, Property 14: Multi-Filter Application**
+    **Validates: Requirements 5.5**
+    """
+    
+    @settings(max_examples=100)
+    @given(
+        issue_types=st.lists(
+            st.sampled_from(['bug', 'hot', 'normal']),
+            min_size=1,
+            max_size=20
+        )
+    )
+    def test_issue_type_filter_bug_returns_only_bugs(self, issue_types):
+        """버그 필터는 버그 유형의 게시글만 반환해야 한다."""
+        data_filter = DataFilter()
+        
+        # 테스트 데이터 생성 (issue_type 속성을 가진 분석 결과)
+        posts_with_analysis = []
+        for i, issue_type in enumerate(issue_types):
+            post = PostContent(
+                url=f"https://example.com/{i}",
+                title=f"Test Post {i}",
+                body="Test body",
+                site="ruliweb",
+                keyword="test"
+            )
+            
+            # 간단한 분석 결과 객체 생성
+            class AnalysisResult:
+                def __init__(self, issue_type):
+                    self.issue_type = issue_type
+            
+            analysis = AnalysisResult(issue_type)
+            posts_with_analysis.append((post, analysis))
+        
+        # 버그 필터 적용
+        filtered = data_filter.filter_by_issue_type(
+            posts_with_analysis,
+            issue_type_filter=IssueTypeFilter.BUG
+        )
+        
+        # 모든 필터링된 게시글은 버그 유형이어야 함
+        for post, analysis in filtered:
+            assert analysis.issue_type == 'bug', \
+                f"Issue type {analysis.issue_type} should be 'bug'"
+    
+    @settings(max_examples=100)
+    @given(
+        issue_types=st.lists(
+            st.sampled_from(['bug', 'hot', 'normal']),
+            min_size=1,
+            max_size=20
+        )
+    )
+    def test_issue_type_filter_hot_returns_only_hot(self, issue_types):
+        """핫이슈 필터는 핫이슈 유형의 게시글만 반환해야 한다."""
+        data_filter = DataFilter()
+        
+        # 테스트 데이터 생성
+        posts_with_analysis = []
+        for i, issue_type in enumerate(issue_types):
+            post = PostContent(
+                url=f"https://example.com/{i}",
+                title=f"Test Post {i}",
+                body="Test body",
+                site="ruliweb",
+                keyword="test"
+            )
+            
+            class AnalysisResult:
+                def __init__(self, issue_type):
+                    self.issue_type = issue_type
+            
+            analysis = AnalysisResult(issue_type)
+            posts_with_analysis.append((post, analysis))
+        
+        # 핫이슈 필터 적용
+        filtered = data_filter.filter_by_issue_type(
+            posts_with_analysis,
+            issue_type_filter=IssueTypeFilter.HOT
+        )
+        
+        # 모든 필터링된 게시글은 핫이슈 유형이어야 함
+        for post, analysis in filtered:
+            assert analysis.issue_type == 'hot', \
+                f"Issue type {analysis.issue_type} should be 'hot'"
+    
+    @settings(max_examples=100)
+    @given(
+        is_bug_flags=st.lists(st.booleans(), min_size=1, max_size=20),
+        is_hot_flags=st.lists(st.booleans(), min_size=1, max_size=20)
+    )
+    def test_issue_type_filter_with_boolean_flags(self, is_bug_flags, is_hot_flags):
+        """is_bug, is_hot 불리언 플래그로도 필터링이 가능해야 한다."""
+        data_filter = DataFilter()
+        
+        # 두 리스트 길이 맞추기
+        min_len = min(len(is_bug_flags), len(is_hot_flags))
+        is_bug_flags = is_bug_flags[:min_len]
+        is_hot_flags = is_hot_flags[:min_len]
+        
+        # 테스트 데이터 생성 (is_bug, is_hot 속성을 가진 분석 결과)
+        posts_with_analysis = []
+        for i, (is_bug, is_hot) in enumerate(zip(is_bug_flags, is_hot_flags)):
+            post = PostContent(
+                url=f"https://example.com/{i}",
+                title=f"Test Post {i}",
+                body="Test body",
+                site="ruliweb",
+                keyword="test"
+            )
+            
+            class AnalysisResult:
+                def __init__(self, is_bug, is_hot):
+                    self.is_bug = is_bug
+                    self.is_hot = is_hot
+            
+            analysis = AnalysisResult(is_bug, is_hot)
+            posts_with_analysis.append((post, analysis))
+        
+        # 버그 필터 적용
+        filtered_bugs = data_filter.filter_by_issue_type(
+            posts_with_analysis,
+            issue_type_filter=IssueTypeFilter.BUG
+        )
+        
+        # 모든 필터링된 게시글은 is_bug=True여야 함
+        for post, analysis in filtered_bugs:
+            assert analysis.is_bug is True, \
+                f"is_bug should be True"
+        
+        # 핫이슈 필터 적용
+        filtered_hot = data_filter.filter_by_issue_type(
+            posts_with_analysis,
+            issue_type_filter=IssueTypeFilter.HOT
+        )
+        
+        # 모든 필터링된 게시글은 is_hot=True여야 함
+        for post, analysis in filtered_hot:
+            assert analysis.is_hot is True, \
+                f"is_hot should be True"
+    
+    @settings(max_examples=100)
+    @given(
+        issue_types=st.lists(
+            st.sampled_from(['bug', 'hot', 'normal']),
+            min_size=1,
+            max_size=20
+        )
+    )
+    def test_issue_type_filter_all_returns_all(self, issue_types):
+        """ALL 필터는 모든 게시글을 반환해야 한다."""
+        data_filter = DataFilter()
+        
+        # 테스트 데이터 생성
+        posts_with_analysis = []
+        for i, issue_type in enumerate(issue_types):
+            post = PostContent(
+                url=f"https://example.com/{i}",
+                title=f"Test Post {i}",
+                body="Test body",
+                site="ruliweb",
+                keyword="test"
+            )
+            
+            class AnalysisResult:
+                def __init__(self, issue_type):
+                    self.issue_type = issue_type
+            
+            analysis = AnalysisResult(issue_type)
+            posts_with_analysis.append((post, analysis))
+        
+        # ALL 필터 적용
+        filtered = data_filter.filter_by_issue_type(
+            posts_with_analysis,
+            issue_type_filter=IssueTypeFilter.ALL
+        )
+        
+        # 모든 게시글이 반환되어야 함
+        assert len(filtered) == len(posts_with_analysis), \
+            "ALL filter should return all posts"

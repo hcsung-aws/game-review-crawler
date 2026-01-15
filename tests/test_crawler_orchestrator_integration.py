@@ -527,3 +527,445 @@ class TestIntegrationWorkflow:
             assert result.total_crawled == 2
             
             orchestrator.close()
+
+
+class TestGameAnalyzerIntegration:
+    """GameAnalyzer 통합 테스트
+    
+    Requirements: 1.1, 2.1, 3.1, 4.1, 5.1
+    - 크롤링 → 분석 → 저장 → 대시보드 표시 end-to-end 테스트
+    """
+    
+    def test_game_analyzer_initialization(self):
+        """GameAnalyzer 초기화 테스트"""
+        from crawler.analysis.game_analyzer import GameAnalyzer
+        
+        analyzer = GameAnalyzer()
+        
+        assert analyzer.sentiment_analyzer is not None
+        assert analyzer.issue_detector is not None
+        assert analyzer.trend_analyzer is not None
+        assert analyzer.alert_manager is not None
+        assert analyzer.analysis_store is not None
+        assert analyzer.profile_manager is not None
+    
+    def test_game_analyzer_analyze_posts(self):
+        """게시글 분석 테스트
+        
+        Requirements: 2.1, 3.1, 4.1
+        - 감성 분석, 이슈 탐지, 트렌드 분석 수행
+        """
+        from crawler.analysis.game_analyzer import GameAnalyzer
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from crawler.exporters.analysis_store import AnalysisDataStore
+            
+            analyzer = GameAnalyzer(
+                analysis_store=AnalysisDataStore(base_dir=tmpdir)
+            )
+            
+            # 테스트 게시글 생성
+            posts = [
+                PostContent(
+                    url="https://example.com/post1",
+                    title="게임 버그 발생",
+                    body="게임에서 심각한 버그가 발생했습니다. 오류가 계속 나요.",
+                    site="example.com",
+                    keyword="게임",
+                    created_at=datetime(2024, 1, 1, 10, 0, 0),
+                    view_count=1000,
+                    like_count=10,
+                    comments=[
+                        Comment(author="유저1", content="저도 같은 문제 있어요"),
+                        Comment(author="유저2", content="빨리 수정해주세요")
+                    ]
+                ),
+                PostContent(
+                    url="https://example.com/post2",
+                    title="게임 재미있어요",
+                    body="정말 재미있는 게임입니다. 추천합니다!",
+                    site="example.com",
+                    keyword="게임",
+                    created_at=datetime(2024, 1, 2, 10, 0, 0),
+                    view_count=500,
+                    like_count=50,
+                    comments=[
+                        Comment(author="유저3", content="동의합니다!")
+                    ]
+                ),
+                PostContent(
+                    url="https://example.com/post3",
+                    title="업데이트 후기",
+                    body="업데이트 후 렉이 심해졌어요. 튕김 현상도 있습니다.",
+                    site="example.com",
+                    keyword="게임",
+                    created_at=datetime(2024, 1, 3, 10, 0, 0),
+                    view_count=800,
+                    like_count=5,
+                    comments=[]
+                )
+            ]
+            
+            # 분석 수행
+            result = analyzer.analyze(
+                game_id="test-game",
+                posts=posts,
+                save_result=True
+            )
+            
+            # 결과 검증
+            assert result.game_id == "test-game"
+            assert result.total_posts == 3
+            assert result.total_comments == 3
+            
+            # 감성 분포 검증
+            assert "positive" in result.sentiment_distribution
+            assert "negative" in result.sentiment_distribution
+            assert "neutral" in result.sentiment_distribution
+            
+            # 이슈 탐지 검증
+            assert isinstance(result.issues, list)
+            
+            # 버그 이슈 검증 (버그, 오류, 렉, 튕김 키워드 포함)
+            assert isinstance(result.bug_issues, list)
+            
+            # 트렌드 검증
+            assert result.sentiment_trend is not None
+            assert result.sentiment_trend.metric_name == "sentiment"
+    
+    def test_orchestrator_with_auto_analyze(self):
+        """CrawlerOrchestrator 자동 분석 테스트
+        
+        Requirements: 1.1, 2.1, 3.1, 4.1
+        - 크롤링 후 자동 분석 수행
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = CrawlerConfig(output_dir=tmpdir)
+            orchestrator = CrawlerOrchestrator(config)
+            
+            # Mock 게시글
+            mock_posts = [
+                PostContent(
+                    url="https://example.com/post1",
+                    title="게임 리뷰",
+                    body="재미있는 게임입니다.",
+                    site="example.com",
+                    keyword="게임",
+                    created_at=datetime.now(),
+                    view_count=100,
+                    like_count=10,
+                    comments=[]
+                )
+            ]
+            
+            # Mock 검색 결과
+            mock_search_results = [
+                SearchResult(
+                    url="https://example.com/post1",
+                    title="게임 리뷰",
+                    snippet="재미있는 게임",
+                    relevance_score=0.9
+                )
+            ]
+            
+            mock_adapter = MockSearchAdapter("TestAdapter", mock_search_results)
+            orchestrator.search_engine._adapters = [mock_adapter]
+            
+            with patch.object(
+                orchestrator.content_crawler,
+                'crawl_post',
+                return_value=mock_posts[0]
+            ):
+                result = orchestrator.crawl(
+                    keywords=["게임"],
+                    sites=["example.com"],
+                    max_results_per_site=10,
+                    save_results=True,
+                    game_id="test-game",
+                    auto_analyze=True
+                )
+            
+            # 크롤링 결과 검증
+            assert result.total_crawled == 1
+            assert result.game_id == "test-game"
+            
+            # 자동 분석 결과 검증
+            assert result.analysis_result is not None
+            assert result.analysis_result.game_id == "test-game"
+            assert result.analysis_result.total_posts == 1
+            
+            orchestrator.close()
+    
+    def test_orchestrator_crawl_game_profile(self):
+        """게임 프로필 기반 크롤링 테스트
+        
+        Requirements: 1.1
+        - 게임 프로필의 키워드와 대상 사이트를 사용하여 크롤링
+        """
+        from crawler.models.game_profile import GameProfile
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = CrawlerConfig(output_dir=tmpdir)
+            orchestrator = CrawlerOrchestrator(config)
+            
+            # 게임 프로필 생성
+            profile = GameProfile(
+                game_id="monster-hunter",
+                game_name="몬스터헌터",
+                keywords=["몬스터헌터", "몬헌"],
+                target_sites=["inven.co.kr", "ruliweb.com"],
+                data_dir=os.path.join(tmpdir, "data/monster-hunter"),
+                quicksight_dir=os.path.join(tmpdir, "quicksight_data/monster-hunter")
+            )
+            
+            # Mock 검색 결과
+            mock_search_results = [
+                SearchResult(
+                    url="https://inven.co.kr/post1",
+                    title="몬스터헌터 공략",
+                    snippet="몬헌 공략",
+                    relevance_score=0.9
+                )
+            ]
+            
+            mock_post = PostContent(
+                url="https://inven.co.kr/post1",
+                title="몬스터헌터 공략",
+                body="몬헌 공략 내용",
+                site="inven.co.kr",
+                keyword="몬스터헌터",
+                created_at=datetime.now(),
+                view_count=500,
+                like_count=20,
+                comments=[]
+            )
+            
+            mock_adapter = MockSearchAdapter("TestAdapter", mock_search_results)
+            orchestrator.search_engine._adapters = [mock_adapter]
+            
+            with patch.object(
+                orchestrator.content_crawler,
+                'crawl_post',
+                return_value=mock_post
+            ):
+                result = orchestrator.crawl_game(
+                    profile=profile,
+                    max_results_per_site=10,
+                    save_results=True,
+                    auto_analyze=False
+                )
+            
+            # 결과 검증
+            assert result.game_id == "monster-hunter"
+            assert result.total_crawled == 1
+            assert "몬스터헌터" in result.keywords_used or "몬헌" in result.keywords_used
+            
+            # 게임별 디렉토리 생성 확인
+            assert os.path.exists(os.path.join(tmpdir, "data/monster-hunter"))
+            
+            orchestrator.close()
+    
+    def test_full_analysis_pipeline(self):
+        """전체 분석 파이프라인 테스트
+        
+        Requirements: 1.1, 2.1, 3.1, 4.1, 5.1
+        - 크롤링 → 분석 → 저장 → 조회 end-to-end 테스트
+        """
+        from crawler.analysis.game_analyzer import GameAnalyzer
+        from crawler.exporters.analysis_store import AnalysisDataStore
+        from crawler.models.game_profile import GameProfile, GameProfileManager
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # 컴포넌트 초기화
+            profile_manager = GameProfileManager(
+                base_data_dir=os.path.join(tmpdir, "data"),
+                base_quicksight_dir=os.path.join(tmpdir, "quicksight_data")
+            )
+            
+            analysis_store = AnalysisDataStore(
+                base_dir=os.path.join(tmpdir, "analysis_data")
+            )
+            
+            analyzer = GameAnalyzer(
+                analysis_store=analysis_store,
+                profile_manager=profile_manager
+            )
+            
+            # 게임 프로필 등록
+            profile = GameProfile(
+                game_id="test-game",
+                game_name="테스트 게임",
+                keywords=["테스트"],
+                target_sites=["example.com"]
+            )
+            profile_manager.register_game(profile)
+            
+            # 테스트 게시글 생성
+            posts = [
+                PostContent(
+                    url="https://example.com/post1",
+                    title="버그 신고",
+                    body="심각한 버그가 있습니다. 오류 발생.",
+                    site="example.com",
+                    keyword="테스트",
+                    created_at=datetime(2024, 1, 1),
+                    view_count=1000,
+                    like_count=5,
+                    comments=[
+                        Comment(author="유저1", content="저도 같은 문제")
+                    ]
+                ),
+                PostContent(
+                    url="https://example.com/post2",
+                    title="좋은 게임",
+                    body="정말 재미있어요! 추천합니다.",
+                    site="example.com",
+                    keyword="테스트",
+                    created_at=datetime(2024, 1, 2),
+                    view_count=500,
+                    like_count=50,
+                    comments=[]
+                )
+            ]
+            
+            # 1. 분석 수행
+            result = analyzer.analyze(
+                game_id="test-game",
+                posts=posts,
+                save_result=True
+            )
+            
+            # 2. 분석 결과 검증
+            assert result.game_id == "test-game"
+            assert result.total_posts == 2
+            assert result.total_comments == 1
+            
+            # 3. 저장된 결과 조회
+            loaded_result = analysis_store.get_latest_analysis("test-game")
+            assert loaded_result is not None
+            assert loaded_result.game_id == "test-game"
+            assert loaded_result.total_posts == 2
+            
+            # 4. 분석 요약 조회
+            summary = analyzer.get_analysis_summary("test-game")
+            assert summary is not None
+            assert summary["game_id"] == "test-game"
+            assert summary["total_posts"] == 2
+    
+    def test_sentiment_only_analysis(self):
+        """감성 분석만 수행 테스트
+        
+        Requirements: 2.1
+        """
+        from crawler.analysis.game_analyzer import GameAnalyzer
+        
+        analyzer = GameAnalyzer()
+        
+        posts = [
+            PostContent(
+                url="https://example.com/post1",
+                title="좋아요",
+                body="정말 좋습니다. 재미있어요!",
+                site="example.com",
+                keyword="test",
+                view_count=100,
+                like_count=10,
+                comments=[]
+            ),
+            PostContent(
+                url="https://example.com/post2",
+                title="별로",
+                body="실망입니다. 불만족스러워요.",
+                site="example.com",
+                keyword="test",
+                view_count=50,
+                like_count=2,
+                comments=[]
+            )
+        ]
+        
+        result = analyzer.analyze_sentiment_only(posts)
+        
+        assert "distribution" in result
+        assert "average_score" in result
+        assert "negative_post_count" in result
+        assert result["total_posts"] == 2
+    
+    def test_issues_only_detection(self):
+        """이슈 탐지만 수행 테스트
+        
+        Requirements: 3.1
+        """
+        from crawler.analysis.game_analyzer import GameAnalyzer
+        
+        analyzer = GameAnalyzer()
+        
+        posts = [
+            PostContent(
+                url="https://example.com/post1",
+                title="버그 발생",
+                body="게임에서 버그가 발생했습니다.",
+                site="example.com",
+                keyword="test",
+                view_count=1000,
+                like_count=10,
+                comments=[]
+            ),
+            PostContent(
+                url="https://example.com/post2",
+                title="버그 또 발생",
+                body="또 버그가 발생했어요. 오류입니다.",
+                site="example.com",
+                keyword="test",
+                view_count=800,
+                like_count=5,
+                comments=[]
+            )
+        ]
+        
+        result = analyzer.detect_issues_only(posts)
+        
+        assert "issues" in result
+        assert "hot_issues" in result
+        assert "bug_issues" in result
+        assert "total_issues" in result
+    
+    def test_trend_only_analysis(self):
+        """트렌드 분석만 수행 테스트
+        
+        Requirements: 4.1
+        """
+        from crawler.analysis.game_analyzer import GameAnalyzer
+        
+        analyzer = GameAnalyzer()
+        
+        posts = [
+            PostContent(
+                url="https://example.com/post1",
+                title="Day 1",
+                body="좋아요",
+                site="example.com",
+                keyword="test",
+                created_at=datetime(2024, 1, 1),
+                view_count=100,
+                like_count=10,
+                comments=[]
+            ),
+            PostContent(
+                url="https://example.com/post2",
+                title="Day 2",
+                body="별로예요",
+                site="example.com",
+                keyword="test",
+                created_at=datetime(2024, 1, 2),
+                view_count=50,
+                like_count=2,
+                comments=[]
+            )
+        ]
+        
+        result = analyzer.analyze_trend_only(posts, period="daily")
+        
+        assert result.metric_name == "sentiment"
+        assert result.period == "daily"
+        assert len(result.data_points) == 2
